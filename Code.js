@@ -72,76 +72,130 @@ function getLessons() {
 
 
 /**
- * Retrieves all the data for a specific lesson from the spreadsheet.
- * It finds the row with the matching lesson name and collects all valid
- * image URLs and descriptions.
+ * Retrieves all data for a specific lesson, including image views and their associated clickable zones.
+ * It first gets the image sequence from "Lesson Database", then fetches corresponding zone data from "Zone Database".
  * @param {string} lessonName The name of the lesson to retrieve.
- * @returns {Array<Object>} An array of "view" objects, where each object has an `imageUrl` and a `description`.
+ * @returns {Array<Object>} An array of "view" objects, each with an `imageUrl`, `description`, and a `zones` array.
  */
 function getLessonData(lessonName) {
   try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Lesson Database");
-    if (!sheet) {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const lessonSheet = spreadsheet.getSheetByName("Lesson Database");
+    if (!lessonSheet) {
       throw new Error("'Lesson Database' sheet not found.");
     }
-    
-    const data = sheet.getDataRange().getValues();
-    const headers = data.shift(); // Remove header row
-    
-    // Find the row that matches the selected lessonName
-    const lessonRow = data.find(row => row[0] === lessonName);
-    
+
+    // --- 1. Get Image Views from "Lesson Database" ---
+    const lessonData = lessonSheet.getDataRange().getValues();
+    lessonData.shift(); // Remove header row
+    const lessonRow = lessonData.find(row => row[0] === lessonName);
+
     if (!lessonRow) {
       return []; // Return empty if lesson not found
     }
     
     const views = [];
-    // Iterate through the columns by steps of 2 (Description, URL)
-    // Starting from column B (index 1)
+    // Iterate through image description/URL pairs
     for (let i = 1; i < lessonRow.length; i += 2) {
       const description = lessonRow[i];
-      const imageUrl = convertGoogleDriveUrl(lessonRow[i + 1]); // Convert the URL here
+      const rawUrl = lessonRow[i + 1];
       
-      // Only add the view if both the description and URL are not blank
-      if (description && imageUrl && description.toString().trim() !== "" && imageUrl.toString().trim() !== "") {
+      if (description && rawUrl && description.toString().trim() !== "" && rawUrl.toString().trim() !== "") {
         views.push({
           description: description,
-          imageUrl: imageUrl
+          imageUrl: convertGoogleDriveUrl(rawUrl), // The URL used by the client
+          rawUrl: rawUrl, // The original URL from the sheet for matching
+          zones: [] // Initialize zones array
         });
       }
     }
+
+    // --- 2. Get Zone Data from "Zone Database" (if it exists) ---
+    const zoneSheet = spreadsheet.getSheetByName("Zone Database");
+    if (!zoneSheet) {
+      Logger.log("INFO: 'Zone Database' sheet not found. Proceeding without clickable zones.");
+      views.forEach(v => delete v.rawUrl); // Clean up rawUrl before sending
+      return views;
+    }
+
+    const zoneData = zoneSheet.getDataRange().getValues();
+    zoneData.shift(); // Remove header row
+
+    // Create a map of zones for efficient lookup, keyed by "LessonName::ImageURL"
+    const zonesMap = {};
+    zoneData.forEach(row => {
+        const zLessonName = row[0];
+        const zRawUrl = row[1];
+        if (zLessonName && zRawUrl && zLessonName.trim() !== "" && zRawUrl.trim() !== "") {
+            const key = `${zLessonName}::${zRawUrl}`;
+            if (!zonesMap[key]) {
+                zonesMap[key] = [];
+            }
+            // Add the zone with parsed coordinates
+            zonesMap[key].push({
+                x: parseInt(row[2], 10),
+                y: parseInt(row[3], 10),
+                w: parseInt(row[4], 10),
+                h: parseInt(row[5], 10),
+                text: row[6] || ""
+            });
+        }
+    });
+
+    // --- 3. Match Zones to their respective Views ---
+    views.forEach(view => {
+      const key = `${lessonName}::${view.rawUrl}`;
+      if (zonesMap[key]) {
+        // Filter out any zones that might have invalid coordinate data after parsing
+        view.zones = zonesMap[key].filter(z =>
+            !isNaN(z.x) && !isNaN(z.y) && !isNaN(z.w) && !isNaN(z.h)
+        );
+      }
+      delete view.rawUrl; // Clean up the rawUrl before sending to the client
+    });
+
     return views;
+
   } catch (error) {
-    Logger.log(error.toString());
+    Logger.log(`Error in getLessonData: ${error.toString()}`);
     return []; // Return an empty array on error
   }
 }
 
+
 /**
- * A diagnostic function to test if the script can access the spreadsheet.
- * This is used to isolate permissions/access issues from the client-side.
+ * A diagnostic function to test if the script can access the required spreadsheet sheets.
+ * Checks for both "Lesson Database" and the optional "Zone Database".
  * @returns {string} A detailed success or failure message.
  */
 function diagnoseSpreadsheetAccess() {
   try {
-    // 1. Try to get the active spreadsheet object
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     if (!spreadsheet) {
-      return "DIAGNOSTIC FAILED: SpreadsheetApp.getActiveSpreadsheet() returned null. This can happen if the script is not correctly bound to a spreadsheet.";
+      return "DIAGNOSTIC FAILED: SpreadsheetApp.getActiveSpreadreadsheet() returned null. The script may not be correctly bound to a spreadsheet.";
     }
 
-    // 2. Try to get the specific sheet by its name
-    const sheet = spreadsheet.getSheetByName("Lesson Database");
-    if (!sheet) {
-      return "DIAGNOSTIC FAILED: Could not find a sheet named 'Lesson Database'. Please check for typos or extra spaces in the sheet tab name.";
+    // Check for the mandatory "Lesson Database" sheet
+    const lessonSheet = spreadsheet.getSheetByName("Lesson Database");
+    if (!lessonSheet) {
+      return "DIAGNOSTIC FAILED: Could not find the required sheet named 'Lesson Database'. Please check for typos or extra spaces.";
     }
 
-    // 3. If everything works, return a clear success message
-    return `DIAGNOSTIC PASSED: Successfully accessed sheet named '${sheet.getName()}'. The issue is likely not with spreadsheet access itself.`;
+    // Check for the optional "Zone Database" sheet and create a status message
+    const zoneSheet = spreadsheet.getSheetByName("Zone Database");
+    let zoneSheetStatus = "";
+    if (!zoneSheet) {
+      zoneSheetStatus = "INFO: 'Zone Database' sheet was not found. This is optional and only needed for clickable zones.";
+    } else {
+      zoneSheetStatus = "INFO: Successfully found 'Zone Database' sheet.";
+    }
+
+    // Return a comprehensive success message
+    return `DIAGNOSTIC PASSED: Successfully accessed '${lessonSheet.getName()}'. ${zoneSheetStatus}`;
 
   } catch (e) {
-    // 4. If any part of the process fails, return the specific server-side error
-    return `DIAGNOSTIC FAILED: An error occurred on the server while trying to access the spreadsheet. Error message: ${e.toString()}`;
+    // Catch any other server-side errors during access
+    return `DIAGNOSTIC FAILED: An error occurred on the server: ${e.toString()}`;
   }
 }
 

@@ -12,7 +12,41 @@
         }
         #simulation-container {
             transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+            cursor: default; /* Change default cursor */
+        }
+        .clickable-zone {
+            position: absolute;
+            border: 2px dashed rgba(255, 255, 255, 0.7);
+            background-color: rgba(0, 123, 255, 0.2);
             cursor: pointer;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .clickable-zone:hover {
+            background-color: rgba(0, 123, 255, 0.4);
+            border-color: rgba(255, 255, 255, 1);
+        }
+        .zone-popup {
+            position: absolute;
+            bottom: 105%; /* Position above the zone */
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s, visibility 0.2s;
+            pointer-events: none; /* So it doesn't interfere with clicks */
+        }
+        .clickable-zone:hover .zone-popup {
+            opacity: 1;
+            visibility: visible;
         }
         .view-change-start {
             opacity: 0;
@@ -75,12 +109,23 @@
             <div id="simulation-container" class="relative w-full max-w-3xl mx-auto aspect-video rounded-lg overflow-hidden shadow-inner border border-gray-200 dark:border-gray-700">
                 <img id="main-image" src="" alt="Anatomy diagram" class="w-full h-full object-contain microscope-image">
             </div>
+            <div id="coordinate-helper-container" class="hidden mt-4 p-4 bg-blue-100 dark:bg-blue-900 border border-blue-300 dark:border-blue-700 rounded-lg text-center">
+                <h3 class="font-bold text-blue-800 dark:text-blue-200">Coordinate Helper Mode</h3>
+                <p class="text-sm text-blue-700 dark:text-blue-300 mt-1">Click on the image to get the coordinates. The coordinates are relative to the original image dimensions.</p>
+                <p class="mt-2 p-2 bg-blue-200 dark:bg-blue-800 text-blue-900 dark:text-blue-100 text-lg rounded font-mono">
+                    <span id="coordinates-display">Click to get coordinates</span>
+                </p>
+            </div>
             <div class="mt-4 flex justify-between items-center">
                  <button id="back-to-lessons-button" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all">
                     Back to Lessons
                 </button>
+                <div class="flex-grow"></div>
                 <button id="back-button" class="px-6 py-2 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-all hidden">
                     Previous Image
+                </button>
+                 <button id="next-button" class="px-6 py-2 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 transition-all ml-4 hidden">
+                    Next Image
                 </button>
             </div>
         </div>
@@ -99,9 +144,13 @@
         const mainImage = document.getElementById('main-image');
         const backToLessonsButton = document.getElementById('back-to-lessons-button');
         const backButton = document.getElementById('back-button');
+        const nextButton = document.getElementById('next-button');
+        const coordinateHelperContainer = document.getElementById('coordinate-helper-container');
+        const coordinatesDisplay = document.getElementById('coordinates-display');
 
         let currentLessonViews = [];
         let currentViewIndex = -1;
+        let isCoordinatesToolActive = false;
 
         /**
          * Builds the lesson cards on the landing page.
@@ -140,6 +189,10 @@
             simulationContainer.style.display = 'none';
             lessonTitle.textContent = lessonName;
             
+            if (isCoordinatesToolActive) {
+                instructionText.textContent = "Coordinate Helper Mode is active. Click the image to get coordinates.";
+            }
+
             google.script.run.withSuccessHandler(startLesson).getLessonData(lessonName);
         }
 
@@ -160,17 +213,77 @@
         }
 
         /**
+         * Removes all existing clickable zone elements from the container.
+         */
+        function clearZones() {
+            const existingZones = simulationContainer.querySelectorAll('.clickable-zone');
+            existingZones.forEach(zone => zone.remove());
+        }
+
+        /**
+         * Renders clickable zones on the image.
+         */
+        function renderZones(view) {
+            clearZones();
+            if (!view.zones || view.zones.length === 0 || isCoordinatesToolActive) {
+                nextButton.classList.remove('hidden'); // Show next button if no zones
+                return;
+            }
+
+            const img = mainImage;
+            const renderedWidth = img.clientWidth;
+            const renderedHeight = img.clientHeight;
+            const originalWidth = img.naturalWidth;
+            const originalHeight = img.naturalHeight;
+
+            // Check for valid dimensions to prevent division by zero
+            if (renderedWidth === 0 || renderedHeight === 0 || originalWidth === 0 || originalHeight === 0) {
+                 console.error("Image dimensions are not ready for zone rendering.");
+                 return;
+            }
+
+            const xRatio = renderedWidth / originalWidth;
+            const yRatio = renderedHeight / originalHeight;
+
+            view.zones.forEach(zone => {
+                const zoneEl = document.createElement('div');
+                zoneEl.className = 'clickable-zone';
+                zoneEl.style.left = `${zone.x * xRatio}px`;
+                zoneEl.style.top = `${zone.y * yRatio}px`;
+                zoneEl.style.width = `${zone.w * xRatio}px`;
+                zoneEl.style.height = `${zone.h * yRatio}px`;
+
+                const popup = document.createElement('div');
+                popup.className = 'zone-popup';
+                popup.textContent = zone.text;
+                zoneEl.appendChild(popup);
+
+                zoneEl.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevents the main container click event
+                    // If you want an action on click, like showing a modal, it would go here.
+                    // For now, the hover popup is the main interaction.
+                    instructionText.textContent = zone.text;
+                });
+
+                simulationContainer.appendChild(zoneEl);
+            });
+        }
+
+        /**
          * Renders a specific image and description in the simulation view.
          */
         function renderView(viewIndex) {
             if (viewIndex < 0 || viewIndex >= currentLessonViews.length) return;
 
             const view = currentLessonViews[viewIndex];
+            clearZones();
             simulationContainer.classList.add('view-change-start');
 
             setTimeout(() => {
                 currentViewIndex = viewIndex;
-                instructionText.textContent = view.description;
+                if (!isCoordinatesToolActive) {
+                    instructionText.textContent = view.description;
+                }
                 mainImage.src = view.imageUrl;
                 
                 if (viewIndex > 0) mainImage.classList.add('blur-in');
@@ -181,17 +294,44 @@
                     if (viewIndex > 0) {
                         setTimeout(() => mainImage.classList.remove('blur-in'), 100);
                     }
+                    renderZones(view);
                 };
                 
                 backButton.classList.toggle('hidden', viewIndex === 0);
+                nextButton.classList.toggle('hidden', viewIndex >= currentLessonViews.length - 1 || (view.zones && view.zones.length > 0));
             }, 500);
         }
 
         // --- EVENT LISTENERS ---
-        simulationContainer.addEventListener('click', () => renderView(currentViewIndex + 1));
+        simulationContainer.addEventListener('click', (e) => {
+            if (isCoordinatesToolActive) {
+                const img = mainImage;
+                const rect = img.getBoundingClientRect();
+                if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
+                    coordinatesDisplay.textContent = "Clicked outside image bounds.";
+                    return;
+                }
+                const clickXOnElement = e.clientX - rect.left;
+                const clickYOnElement = e.clientY - rect.top;
+                const originalWidth = img.naturalWidth;
+                const originalHeight = img.naturalHeight;
+                const renderedWidth = rect.width;
+                const renderedHeight = rect.height;
+                const xRatio = originalWidth / renderedWidth;
+                const yRatio = originalHeight / renderedHeight;
+                const finalX = Math.round(clickXOnElement * xRatio);
+                const finalY = Math.round(clickYOnElement * yRatio);
+                coordinatesDisplay.textContent = `x: ${finalX}, y: ${finalY}`;
+            }
+            // The general click-to-advance is now handled by the next button
+        });
         backButton.addEventListener('click', (e) => {
             e.stopPropagation();
             renderView(currentViewIndex - 1);
+        });
+        nextButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            renderView(currentViewIndex + 1);
         });
         backToLessonsButton.addEventListener('click', () => {
             simulationView.style.display = 'none';
@@ -202,6 +342,14 @@
 
         // --- INITIALIZATION ---
         window.addEventListener('load', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            isCoordinatesToolActive = urlParams.get('tool') === 'coordinates';
+
+            if (isCoordinatesToolActive) {
+                coordinateHelperContainer.classList.remove('hidden');
+                simulationContainer.style.cursor = 'crosshair';
+            }
+
             // Run the diagnostic test first
             loaderContainer.innerHTML = `<div class="loader"></div><p class="mt-2 text-sm text-gray-500">Running diagnostics...</p>`;
             google.script.run.withSuccessHandler(showDiagnosticResult).diagnoseSpreadsheetAccess();
