@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Anatomy Lab</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        #simulation-container {
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+            cursor: pointer;
+        }
+        .view-change-start {
+            opacity: 0;
+            transform: scale(0.95) rotate(-3deg);
+        }
+        .microscope-image {
+            transition: filter 0.8s ease-in-out;
+        }
+        .blur-in {
+            filter: blur(8px);
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 4px solid #3498db;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .lesson-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .lesson-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-5xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-4 md:p-6 lg:p-8">
+
+        <!-- View 1: Landing Page -->
+        <div id="landing-page">
+            <header class="text-center mb-6">
+                <h1 class="text-3xl md:text-4xl font-bold text-blue-600 dark:text-blue-400">Interactive Anatomy Lab</h1>
+                <p class="text-md text-gray-600 dark:text-gray-400 mt-2">Please select a lesson to begin.</p>
+            </header>
+            <div id="loader-container" class="flex justify-center items-center p-8">
+                <div class="loader"></div>
+            </div>
+            <div id="lesson-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Lesson cards will be injected here by JavaScript -->
+            </div>
+        </div>
+
+        <!-- View 2: Simulation View (Initially Hidden) -->
+        <div id="simulation-view" class="hidden">
+            <header class="text-center mb-4">
+                 <h1 id="lesson-title" class="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400"></h1>
+                 <p id="instruction-text" class="text-md text-gray-600 dark:text-gray-400 mt-1 min-h-[24px]"></p>
+            </header>
+            <div id="simulation-loader" class="flex justify-center items-center p-8 hidden">
+                <div class="loader"></div>
+            </div>
+            <div id="simulation-container" class="relative w-full max-w-3xl mx-auto aspect-video rounded-lg overflow-hidden shadow-inner border border-gray-200 dark:border-gray-700">
+                <img id="main-image" src="" alt="Anatomy diagram" class="w-full h-full object-contain microscope-image">
+            </div>
+            <div class="mt-4 flex justify-between items-center">
+                 <button id="back-to-lessons-button" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all">
+                    Back to Lessons
+                </button>
+                <button id="back-button" class="px-6 py-2 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-all hidden">
+                    Previous Image
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM Element References
+        const landingPage = document.getElementById('landing-page');
+        const simulationView = document.getElementById('simulation-view');
+        const loaderContainer = document.getElementById('loader-container');
+        const simulationLoader = document.getElementById('simulation-loader');
+        const lessonCardsContainer = document.getElementById('lesson-cards-container');
+        const lessonTitle = document.getElementById('lesson-title');
+        const instructionText = document.getElementById('instruction-text');
+        const simulationContainer = document.getElementById('simulation-container');
+        const mainImage = document.getElementById('main-image');
+        const backToLessonsButton = document.getElementById('back-to-lessons-button');
+        const backButton = document.getElementById('back-button');
+
+        let currentLessonViews = [];
+        let currentViewIndex = -1;
+
+        /**
+         * Builds the lesson cards on the landing page.
+         */
+        function buildLandingPage(lessons) {
+            loaderContainer.style.display = 'none';
+            lessonCardsContainer.innerHTML = ''; // Clear previous cards
+
+            if (lessons.length > 0 && lessons[0].error) {
+                lessonCardsContainer.innerHTML = `<p class="text-red-500 col-span-full text-center">${lessons[0].error}</p>`;
+                return;
+            }
+
+            lessons.forEach(lesson => {
+                const card = document.createElement('div');
+                card.className = 'lesson-card bg-gray-50 dark:bg-gray-700 rounded-lg shadow-md overflow-hidden cursor-pointer';
+                card.innerHTML = `
+                    <img src="${lesson.previewImage || 'https://placehold.co/600x400/eeeeee/333333?text=No+Image'}" alt="${lesson.name}" class="w-full h-40 object-cover" onerror="this.src='https://placehold.co/600x400/eeeeee/333333?text=Image+Error'">
+                    <div class="p-4">
+                        <h3 class="font-bold text-lg">${lesson.name}</h3>
+                        <p class="text-gray-600 dark:text-gray-400 text-sm mt-1">${lesson.description || 'No description available.'}</p>
+                    </div>
+                `;
+                card.addEventListener('click', () => selectLesson(lesson.name));
+                lessonCardsContainer.appendChild(card);
+            });
+        }
+        
+        /**
+         * Handles the selection of a lesson from a card.
+         */
+        function selectLesson(lessonName) {
+            landingPage.style.display = 'none';
+            simulationView.style.display = 'block';
+            simulationLoader.style.display = 'flex';
+            simulationContainer.style.display = 'none';
+            lessonTitle.textContent = lessonName;
+            
+            google.script.run.withSuccessHandler(startLesson).getLessonData(lessonName);
+        }
+
+        /**
+         * Kicks off the simulation for the selected lesson.
+         */
+        function startLesson(viewsData) {
+            simulationLoader.style.display = 'none';
+            simulationContainer.style.display = 'block';
+            currentLessonViews = viewsData;
+            
+            if (currentLessonViews.length === 0) {
+                instructionText.textContent = "This lesson has no images to display.";
+                simulationContainer.style.display = 'none';
+                return;
+            }
+            renderView(0);
+        }
+
+        /**
+         * Renders a specific image and description in the simulation view.
+         */
+        function renderView(viewIndex) {
+            if (viewIndex < 0 || viewIndex >= currentLessonViews.length) return;
+
+            const view = currentLessonViews[viewIndex];
+            simulationContainer.classList.add('view-change-start');
+
+            setTimeout(() => {
+                currentViewIndex = viewIndex;
+                instructionText.textContent = view.description;
+                mainImage.src = view.imageUrl;
+                
+                if (viewIndex > 0) mainImage.classList.add('blur-in');
+                else mainImage.classList.remove('blur-in');
+                
+                mainImage.onload = () => {
+                    simulationContainer.classList.remove('view-change-start');
+                    if (viewIndex > 0) {
+                        setTimeout(() => mainImage.classList.remove('blur-in'), 100);
+                    }
+                };
+                
+                backButton.classList.toggle('hidden', viewIndex === 0);
+            }, 500);
+        }
+
+        // --- EVENT LISTENERS ---
+        simulationContainer.addEventListener('click', () => renderView(currentViewIndex + 1));
+        backButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            renderView(currentViewIndex - 1);
+        });
+        backToLessonsButton.addEventListener('click', () => {
+            simulationView.style.display = 'none';
+            landingPage.style.display = 'block';
+            currentViewIndex = -1;
+            currentLessonViews = [];
+        });
+
+        // --- INITIALIZATION ---
+        window.addEventListener('load', () => {
+            // Run the diagnostic test first
+            loaderContainer.innerHTML = `<div class="loader"></div><p class="mt-2 text-sm text-gray-500">Running diagnostics...</p>`;
+            google.script.run.withSuccessHandler(showDiagnosticResult).diagnoseSpreadsheetAccess();
+        });
+
+        /**
+         * Shows the result of the diagnostic test. If it passes, it proceeds to load the lessons.
+         * If it fails, it displays the specific error message from the server.
+         */
+        function showDiagnosticResult(result) {
+            console.log("Diagnostic Result:", result);
+            if (result.startsWith("DIAGNOSTIC PASSED")) {
+                // If the test passes, we remove the diagnostic message and load the app normally
+                loaderContainer.innerHTML = `<div class="loader"></div>`;
+                google.script.run.withSuccessHandler(buildLandingPage).getLessons();
+            } else {
+                // If the test fails, we display the detailed error message and stop.
+                loaderContainer.innerHTML = `
+                    <div class="p-4 bg-red-100 dark:bg-red-900 border border-red-300 dark:border-red-700 rounded-lg text-center">
+                        <h3 class="font-bold text-red-800 dark:text-red-200">System Diagnostic Failed</h3>
+                        <p class="text-sm text-red-700 dark:text-red-300 mt-2">The application could not start due to a server-side error:</p>
+                        <p class="mt-2 p-2 bg-red-200 dark:bg-red-800 text-red-900 dark:text-red-100 text-xs rounded font-mono">${result}</p>
+                    </div>`;
+                lessonCardsContainer.style.display = 'none'; // Hide the card container
+            }
+        }
+    </script>
+</body>
+</html>
+
