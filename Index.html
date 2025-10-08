@@ -550,8 +550,19 @@
     </div>
 
     <script>
-        // Parse tool mode from URL query parameter (e.g., ?tool=coordinates)
-        const TOOL_MODE = new URLSearchParams(window.location.search).get('tool') || '';
+        // Global variable for tool mode - will be initialized on page load
+        var TOOL_MODE = '';
+
+        // Safely parse tool mode from URL query parameter (e.g., ?tool=coordinates)
+        try {
+            if (window.location && window.location.search) {
+                var urlParams = new URLSearchParams(window.location.search);
+                TOOL_MODE = urlParams.get('tool') || '';
+            }
+        } catch (e) {
+            console.error('Error parsing URL parameters:', e);
+            TOOL_MODE = '';
+        }
 
         // DOM Element References
         const landingPage = document.getElementById('landing-page');
@@ -939,19 +950,33 @@
 
         // --- INITIALIZATION ---
         window.addEventListener('load', () => {
-            // Debug logging for tool mode
-            console.log('Server-injected TOOL_MODE:', TOOL_MODE);
-            console.log('Full URL:', window.location.href);
+            try {
+                // Debug logging for tool mode
+                console.log('Server-injected TOOL_MODE:', TOOL_MODE);
+                console.log('Full URL:', window.location.href);
 
-            // Check if we're in coordinate helper mode using server-injected variable
-            if (TOOL_MODE === 'coordinates') {
-                console.log('Coordinate Helper Mode Detected - Initializing...');
-                initializeCoordinateHelper();
-                return;
+                // Check if we're in coordinate helper mode using server-injected variable
+                if (TOOL_MODE === 'coordinates') {
+                    console.log('Coordinate Helper Mode Detected - Initializing...');
+                    initializeCoordinateHelper();
+                    return;
+                }
+
+                // Load lessons directly
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run.withSuccessHandler(buildLandingPage).getLessons();
+                } else {
+                    console.error('Google Apps Script API not available');
+                    lessonCardsContainer.innerHTML = '<p class="text-red-500 col-span-full text-center">Unable to connect to Google Apps Script. Please refresh the page.</p>';
+                    loaderContainer.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Initialization error:', error);
+                if (loaderContainer) loaderContainer.style.display = 'none';
+                if (lessonCardsContainer) {
+                    lessonCardsContainer.innerHTML = '<p class="text-red-500 col-span-full text-center">An error occurred during initialization. Please refresh the page.</p>';
+                }
             }
-
-            // Load lessons directly
-            google.script.run.withSuccessHandler(buildLandingPage).getLessons();
         });
 
         // ==============================
@@ -1391,6 +1416,8 @@
             updateJsonOutput();
             redrawCanvas();
         }
+        // Expose to global scope for inline onclick handlers
+        window.deleteZone = deleteZone;
 
         /**
          * Updates the JSON output textareas
@@ -1548,7 +1575,7 @@
                     <div class="p-6">
                         <h3 class="font-bold text-lg">${lesson.name}</h3>
                         <p class="text-gray-600 dark:text-gray-400 text-sm mt-1">${lesson.description || 'No description'}</p>
-                        <button onclick="editLesson('${lesson.name.replace(/'/g, "\\'")}')" class="mt-4 w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded hover:bg-blue-700 transition-all">
+                        <button onclick="editLesson('${lesson.name.replace(/'/g, "&#39;")}')" class="mt-4 w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded hover:bg-blue-700 transition-all">
                             Edit Lesson
                         </button>
                     </div>
@@ -1576,6 +1603,8 @@
             adminState.currentLessonTitle = lessonName;
             showImageManager(lessonName);
         }
+        // Expose to global scope for inline onclick handlers
+        window.editLesson = editLesson;
 
         /**
          * Saves a new lesson
@@ -1976,6 +2005,8 @@
             updateAdminZonesList();
             redrawAdminCanvas();
         }
+        // Expose to global scope for inline onclick handlers
+        window.deleteAdminZone = deleteAdminZone;
 
         /**
          * Saves zones and returns to image manager
@@ -2037,40 +2068,46 @@
                 })
                 .getLessonForEditing(adminState.currentLessonTitle);
         }
+        // Expose to global scope for inline onclick handlers
+        window.editImageZones = editImageZones;
 
         // Event listeners for admin buttons
         document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('lesson-setup-button')?.addEventListener('click', showAdminLogin);
-            document.getElementById('admin-login-btn')?.addEventListener('click', handleAdminLogin);
-            document.getElementById('admin-login-cancel')?.addEventListener('click', hideAdminLogin);
-            document.getElementById('admin-create-lesson-btn')?.addEventListener('click', showCreateLessonForm);
-            document.getElementById('admin-save-lesson-btn')?.addEventListener('click', saveLesson);
-            document.getElementById('admin-cancel-lesson-btn')?.addEventListener('click', showAdminLessonList);
-            document.getElementById('admin-back-to-main')?.addEventListener('click', () => {
-                document.getElementById('admin-view').classList.add('hidden');
-                landingPage.style.display = 'block';
-            });
-            document.getElementById('admin-back-to-lesson-list')?.addEventListener('click', showAdminLessonList);
-            document.getElementById('clear-image-btn')?.addEventListener('click', clearImage);
-            document.getElementById('save-and-define-zones-btn')?.addEventListener('click', saveAndDefineZones);
-            document.getElementById('admin-clear-zones')?.addEventListener('click', () => {
-                if (confirm('Clear all zones?')) {
-                    adminState.zones = [];
-                    updateAdminZonesList();
-                    redrawAdminCanvas();
-                }
-            });
-            document.getElementById('admin-save-zones-btn')?.addEventListener('click', saveAdminZones);
-            document.getElementById('admin-back-to-images')?.addEventListener('click', () => {
-                showImageManager(adminState.currentLessonTitle);
-            });
+            try {
+                document.getElementById('lesson-setup-button')?.addEventListener('click', showAdminLogin);
+                document.getElementById('admin-login-btn')?.addEventListener('click', handleAdminLogin);
+                document.getElementById('admin-login-cancel')?.addEventListener('click', hideAdminLogin);
+                document.getElementById('admin-create-lesson-btn')?.addEventListener('click', showCreateLessonForm);
+                document.getElementById('admin-save-lesson-btn')?.addEventListener('click', saveLesson);
+                document.getElementById('admin-cancel-lesson-btn')?.addEventListener('click', showAdminLessonList);
+                document.getElementById('admin-back-to-main')?.addEventListener('click', () => {
+                    document.getElementById('admin-view').classList.add('hidden');
+                    landingPage.style.display = 'block';
+                });
+                document.getElementById('admin-back-to-lesson-list')?.addEventListener('click', showAdminLessonList);
+                document.getElementById('clear-image-btn')?.addEventListener('click', clearImage);
+                document.getElementById('save-and-define-zones-btn')?.addEventListener('click', saveAndDefineZones);
+                document.getElementById('admin-clear-zones')?.addEventListener('click', () => {
+                    if (confirm('Clear all zones?')) {
+                        adminState.zones = [];
+                        updateAdminZonesList();
+                        redrawAdminCanvas();
+                    }
+                });
+                document.getElementById('admin-save-zones-btn')?.addEventListener('click', saveAdminZones);
+                document.getElementById('admin-back-to-images')?.addEventListener('click', () => {
+                    showImageManager(adminState.currentLessonTitle);
+                });
 
-            // Handle Enter key in login form
-            document.getElementById('admin-password')?.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    handleAdminLogin();
-                }
-            });
+                // Handle Enter key in login form
+                document.getElementById('admin-password')?.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        handleAdminLogin();
+                    }
+                });
+            } catch (error) {
+                console.error('Error setting up event listeners:', error);
+            }
         });
     </script>
 </body>
