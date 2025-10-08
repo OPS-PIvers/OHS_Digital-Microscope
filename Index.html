@@ -218,6 +218,14 @@
                 <h1 class="text-3xl md:text-4xl font-bold text-blue-600 dark:text-blue-400">Interactive Anatomy Lab</h1>
                 <p class="text-md text-gray-600 dark:text-gray-400 mt-2">Please select a lesson to begin.</p>
             </header>
+            <div class="flex justify-center mb-4">
+                <button id="lesson-setup-button" class="px-6 py-3 bg-gray-700 dark:bg-gray-600 text-white font-semibold rounded-lg shadow-md hover:bg-gray-800 dark:hover:bg-gray-700 transition-all flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" />
+                    </svg>
+                    Lesson Setup
+                </button>
+            </div>
             <div id="loader-container" class="flex justify-center items-center p-8">
                 <div class="loader"></div>
             </div>
@@ -368,11 +376,182 @@
                 </button>
             </div>
         </div>
+
+        <!-- View 4: Admin Lesson Management (Initially Hidden) -->
+        <div id="admin-view" class="hidden">
+
+            <!-- Admin Sub-View 1: Lesson List -->
+            <div id="admin-lesson-list">
+                <header class="text-center mb-6">
+                    <h1 class="text-3xl md:text-4xl font-bold text-blue-600 dark:text-blue-400">Lesson Management</h1>
+                    <p class="text-md text-gray-600 dark:text-gray-400 mt-2">Create and edit lessons</p>
+                </header>
+                <div class="flex justify-between mb-4">
+                    <button id="admin-create-lesson-btn" class="px-6 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition-all">
+                        + Create New Lesson
+                    </button>
+                    <button id="admin-back-to-main" class="px-6 py-2 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 transition-all">
+                        ← Back to Main
+                    </button>
+                </div>
+                <div id="admin-loader-container" class="flex justify-center items-center p-8 hidden">
+                    <div class="loader"></div>
+                </div>
+                <div id="admin-lesson-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Lesson cards will be injected here -->
+                </div>
+            </div>
+
+            <!-- Admin Sub-View 2: Create/Edit Lesson -->
+            <div id="admin-lesson-form" class="hidden">
+                <header class="text-center mb-6">
+                    <h1 id="admin-form-title" class="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400">Create New Lesson</h1>
+                </header>
+                <div class="max-w-2xl mx-auto">
+                    <div class="mb-4">
+                        <label class="block text-sm font-bold mb-2">Lesson Title</label>
+                        <input type="text" id="lesson-title-input" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter lesson title">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-bold mb-2">Lesson Description</label>
+                        <textarea id="lesson-description-input" rows="3" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter lesson description"></textarea>
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="admin-save-lesson-btn" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-all">
+                            Save & Continue to Images
+                        </button>
+                        <button id="admin-cancel-lesson-btn" class="px-6 py-2 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 transition-all">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Admin Sub-View 3: Image Upload & Management -->
+            <div id="admin-image-manager" class="hidden">
+                <header class="text-center mb-4">
+                    <h1 id="admin-image-manager-title" class="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400">Manage Images</h1>
+                    <p id="admin-image-manager-subtitle" class="text-sm text-gray-600 dark:text-gray-400 mt-1"></p>
+                </header>
+
+                <div class="mb-6">
+                    <div class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center bg-gray-50 dark:bg-gray-700">
+                        <input type="file" id="image-file-input" accept="image/*" class="hidden">
+                        <button id="upload-image-btn" class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-all">
+                            📁 Upload Image from Computer
+                        </button>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-4">or paste an image (Ctrl+V / Cmd+V)</p>
+                        <div id="paste-area" class="mt-4 p-4 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 min-h-[100px] focus:outline-none focus:ring-2 focus:ring-blue-500" tabindex="0">
+                            Click here and paste an image
+                        </div>
+                    </div>
+                </div>
+
+                <div id="image-preview-section" class="hidden">
+                    <h3 class="font-bold text-lg mb-2">Image Preview:</h3>
+                    <img id="image-preview" class="max-w-full max-h-64 rounded-lg shadow-md mb-4" alt="Preview">
+                    <div class="mb-4">
+                        <label class="block text-sm font-bold mb-2">Image Description</label>
+                        <input type="text" id="image-description-input" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter image description">
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="save-and-define-zones-btn" class="px-6 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition-all">
+                            Save & Define Click Zones
+                        </button>
+                        <button id="clear-image-btn" class="px-6 py-2 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 transition-all">
+                            Clear
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <h3 class="font-bold text-lg mb-2">Existing Images:</h3>
+                    <div id="existing-images-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Existing images will be listed here -->
+                    </div>
+                </div>
+
+                <div class="mt-4 flex gap-2">
+                    <button id="admin-back-to-lesson-list" class="px-6 py-2 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 transition-all">
+                        ← Back to Lesson List
+                    </button>
+                </div>
+            </div>
+
+            <!-- Admin Sub-View 4: Zone Editor (Integrated from Coordinate Helper) -->
+            <div id="admin-zone-editor" class="hidden">
+                <header class="text-center mb-4">
+                    <h1 id="admin-zone-editor-title" class="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400">Define Click Zones</h1>
+                    <p id="admin-zone-editor-subtitle" class="text-sm text-gray-600 dark:text-gray-400 mt-1"></p>
+                </header>
+
+                <div class="mb-4">
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                        <strong>Instructions:</strong> Click and drag on the image to create rectangular zones.
+                    </p>
+                </div>
+
+                <div class="relative w-full max-w-3xl mx-auto bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden border-2 border-gray-300 dark:border-gray-600" id="admin-canvas-wrapper">
+                    <canvas id="admin-canvas" class="w-full cursor-crosshair"></canvas>
+                </div>
+
+                <div class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div>
+                        <h3 class="font-bold text-lg mb-2">Defined Zones:</h3>
+                        <div id="admin-zones-list" class="space-y-2 max-h-64 overflow-y-auto">
+                            <p class="text-sm text-gray-500 dark:text-gray-400">No zones defined yet.</p>
+                        </div>
+                    </div>
+                    <div>
+                        <button id="admin-clear-zones" class="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-all">
+                            🗑️ Clear All Zones
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mt-4 flex gap-2">
+                    <button id="admin-save-zones-btn" class="px-6 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition-all">
+                        💾 Save Zones & Continue
+                    </button>
+                    <button id="admin-back-to-images" class="px-6 py-2 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 transition-all">
+                        ← Back to Images
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Admin Login Modal -->
+        <div id="admin-login-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
+                <h2 class="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-4">Admin Login</h2>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Enter your credentials to access lesson setup.</p>
+                <div class="mb-4">
+                    <label class="block text-sm font-bold mb-2">Username</label>
+                    <input type="text" id="admin-username" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-bold mb-2">Password</label>
+                    <input type="password" id="admin-password" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div id="admin-login-error" class="hidden mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-lg text-sm">
+                </div>
+                <div class="flex gap-2">
+                    <button id="admin-login-btn" class="flex-1 px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-all">
+                        Login
+                    </button>
+                    <button id="admin-login-cancel" class="flex-1 px-6 py-2 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 transition-all">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script>
-        // Server-injected tool mode (from Apps Script doGet function)
-        const TOOL_MODE = '<?= toolMode ?>';
+        // Parse tool mode from URL query parameter (e.g., ?tool=coordinates)
+        const TOOL_MODE = new URLSearchParams(window.location.search).get('tool') || '';
 
         // DOM Element References
         const landingPage = document.getElementById('landing-page');
@@ -1237,6 +1416,662 @@
                 fullMetadataOutput.value = JSON.stringify({ zones: coordHelperState.zones }, null, 2);
             }
         }
+
+        // ==============================
+        // ADMIN LESSON MANAGEMENT
+        // ==============================
+
+        let adminState = {
+            currentLesson: null,
+            currentLessonTitle: null,
+            currentImage: null,
+            currentImageData: null,
+            currentImageIndex: 0,
+            canvas: null,
+            ctx: null,
+            zones: [],
+            isDrawing: false,
+            startX: 0,
+            startY: 0,
+            currentZone: null,
+            folderId: null
+        };
+
+        /**
+         * Shows the admin login modal
+         */
+        function showAdminLogin() {
+            const modal = document.getElementById('admin-login-modal');
+            modal.classList.remove('hidden');
+            document.getElementById('admin-username').value = '';
+            document.getElementById('admin-password').value = '';
+            document.getElementById('admin-login-error').classList.add('hidden');
+        }
+
+        /**
+         * Hides the admin login modal
+         */
+        function hideAdminLogin() {
+            document.getElementById('admin-login-modal').classList.add('hidden');
+        }
+
+        /**
+         * Handles admin login
+         */
+        function handleAdminLogin() {
+            const username = document.getElementById('admin-username').value;
+            const password = document.getElementById('admin-password').value;
+            const errorDiv = document.getElementById('admin-login-error');
+
+            if (!username || !password) {
+                errorDiv.textContent = 'Please enter both username and password.';
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+
+            google.script.run
+                .withSuccessHandler((result) => {
+                    if (result.success) {
+                        hideAdminLogin();
+                        showAdminLessonList();
+                    } else {
+                        errorDiv.textContent = result.message;
+                        errorDiv.classList.remove('hidden');
+                    }
+                })
+                .withFailureHandler((error) => {
+                    errorDiv.textContent = 'Login failed: ' + error.message;
+                    errorDiv.classList.remove('hidden');
+                })
+                .authenticateAdmin(username, password);
+        }
+
+        /**
+         * Shows the admin lesson list view
+         */
+        function showAdminLessonList() {
+            // Hide all views
+            landingPage.style.display = 'none';
+            simulationView.style.display = 'none';
+            document.getElementById('coordinate-helper-view').classList.add('hidden');
+            document.getElementById('admin-view').classList.remove('hidden');
+
+            // Show lesson list sub-view, hide others
+            document.getElementById('admin-lesson-list').classList.remove('hidden');
+            document.getElementById('admin-lesson-form').classList.add('hidden');
+            document.getElementById('admin-image-manager').classList.add('hidden');
+            document.getElementById('admin-zone-editor').classList.add('hidden');
+
+            // Load lessons
+            loadAdminLessons();
+        }
+
+        /**
+         * Loads lessons for admin view
+         */
+        function loadAdminLessons() {
+            const loader = document.getElementById('admin-loader-container');
+            const container = document.getElementById('admin-lesson-cards-container');
+
+            loader.classList.remove('hidden');
+            container.innerHTML = '';
+
+            google.script.run
+                .withSuccessHandler((lessons) => {
+                    loader.classList.add('hidden');
+                    buildAdminLessonCards(lessons);
+                })
+                .withFailureHandler((error) => {
+                    loader.classList.add('hidden');
+                    container.innerHTML = `<p class="text-red-500 col-span-full text-center">Error loading lessons: ${error.message}</p>`;
+                })
+                .getLessons();
+        }
+
+        /**
+         * Builds lesson cards for admin view
+         */
+        function buildAdminLessonCards(lessons) {
+            const container = document.getElementById('admin-lesson-cards-container');
+            container.innerHTML = '';
+
+            if (lessons.length === 0 || (lessons.length > 0 && lessons[0].error)) {
+                container.innerHTML = '<p class="text-gray-500 col-span-full text-center">No lessons found. Create your first lesson!</p>';
+                return;
+            }
+
+            lessons.forEach(lesson => {
+                const card = document.createElement('div');
+                card.className = 'lesson-card bg-gray-50 dark:bg-gray-700 rounded-lg shadow-md overflow-hidden';
+                card.innerHTML = `
+                    <img src="${lesson.previewImage || 'https://placehold.co/600x400/eeeeee/333333?text=No+Image'}" alt="${lesson.name}" class="w-full h-40 object-cover" onerror="this.src='https://placehold.co/600x400/eeeeee/333333?text=Image+Error'">
+                    <div class="p-6">
+                        <h3 class="font-bold text-lg">${lesson.name}</h3>
+                        <p class="text-gray-600 dark:text-gray-400 text-sm mt-1">${lesson.description || 'No description'}</p>
+                        <button onclick="editLesson('${lesson.name.replace(/'/g, "\\'")}')" class="mt-4 w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded hover:bg-blue-700 transition-all">
+                            Edit Lesson
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        /**
+         * Shows the create lesson form
+         */
+        function showCreateLessonForm() {
+            document.getElementById('admin-lesson-list').classList.add('hidden');
+            document.getElementById('admin-lesson-form').classList.remove('hidden');
+            document.getElementById('admin-form-title').textContent = 'Create New Lesson';
+            document.getElementById('lesson-title-input').value = '';
+            document.getElementById('lesson-description-input').value = '';
+            adminState.currentLesson = null;
+        }
+
+        /**
+         * Edits an existing lesson
+         */
+        function editLesson(lessonName) {
+            adminState.currentLessonTitle = lessonName;
+            showImageManager(lessonName);
+        }
+
+        /**
+         * Saves a new lesson
+         */
+        function saveLesson() {
+            const title = document.getElementById('lesson-title-input').value.trim();
+            const description = document.getElementById('lesson-description-input').value.trim();
+
+            if (!title) {
+                alert('Please enter a lesson title.');
+                return;
+            }
+
+            google.script.run
+                .withSuccessHandler((result) => {
+                    if (result.success) {
+                        adminState.currentLessonTitle = title;
+                        adminState.folderId = result.folderId;
+                        showImageManager(title);
+                    } else {
+                        alert('Error creating lesson: ' + result.message);
+                    }
+                })
+                .withFailureHandler((error) => {
+                    alert('Error creating lesson: ' + error.message);
+                })
+                .createLesson(title, description);
+        }
+
+        /**
+         * Shows the image manager view
+         */
+        function showImageManager(lessonName) {
+            document.getElementById('admin-lesson-list').classList.add('hidden');
+            document.getElementById('admin-lesson-form').classList.add('hidden');
+            document.getElementById('admin-image-manager').classList.remove('hidden');
+            document.getElementById('admin-zone-editor').classList.add('hidden');
+
+            document.getElementById('admin-image-manager-title').textContent = 'Manage Images: ' + lessonName;
+            document.getElementById('admin-image-manager-subtitle').textContent = lessonName;
+
+            // Clear image preview
+            document.getElementById('image-preview-section').classList.add('hidden');
+            adminState.currentImageData = null;
+
+            // Load existing images for this lesson
+            loadExistingImages(lessonName);
+        }
+
+        /**
+         * Loads existing images for a lesson
+         */
+        function loadExistingImages(lessonName) {
+            google.script.run
+                .withSuccessHandler((result) => {
+                    if (result.success) {
+                        displayExistingImages(result.data.images);
+                        adminState.currentImageIndex = result.data.images.length;
+                    }
+                })
+                .withFailureHandler((error) => {
+                    console.error('Error loading existing images:', error);
+                })
+                .getLessonForEditing(lessonName);
+        }
+
+        /**
+         * Displays existing images in the admin interface
+         */
+        function displayExistingImages(images) {
+            const container = document.getElementById('existing-images-list');
+            container.innerHTML = '';
+
+            if (images.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 col-span-full">No images yet. Upload your first image!</p>';
+                return;
+            }
+
+            images.forEach((image, idx) => {
+                const imageCard = document.createElement('div');
+                imageCard.className = 'bg-gray-100 dark:bg-gray-700 rounded-lg p-4';
+                imageCard.innerHTML = `
+                    <img src="${image.url}" class="w-full h-32 object-cover rounded mb-2" alt="${image.description}">
+                    <p class="text-sm font-semibold">Image ${idx + 1}</p>
+                    <p class="text-xs text-gray-600 dark:text-gray-400">${image.description}</p>
+                    <button onclick="editImageZones(${idx})" class="mt-2 w-full px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
+                        Edit Zones
+                    </button>
+                `;
+                container.appendChild(imageCard);
+            });
+        }
+
+        /**
+         * Handles file input for image upload
+         */
+        document.addEventListener('DOMContentLoaded', () => {
+            const fileInput = document.getElementById('image-file-input');
+            const uploadBtn = document.getElementById('upload-image-btn');
+            const pasteArea = document.getElementById('paste-area');
+
+            uploadBtn.addEventListener('click', () => {
+                fileInput.click();
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    handleImageFile(file);
+                }
+            });
+
+            // Handle paste events
+            pasteArea.addEventListener('paste', (e) => {
+                const items = e.clipboardData.items;
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].type.indexOf('image') !== -1) {
+                        const blob = items[i].getAsFile();
+                        handleImageFile(blob);
+                        break;
+                    }
+                }
+            });
+        });
+
+        /**
+         * Handles image file (from upload or paste)
+         */
+        function handleImageFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                adminState.currentImageData = e.target.result;
+                document.getElementById('image-preview').src = e.target.result;
+                document.getElementById('image-preview-section').classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        /**
+         * Clears the current image selection
+         */
+        function clearImage() {
+            document.getElementById('image-preview-section').classList.add('hidden');
+            document.getElementById('image-description-input').value = '';
+            adminState.currentImageData = null;
+        }
+
+        /**
+         * Saves image and proceeds to zone definition
+         */
+        function saveAndDefineZones() {
+            const description = document.getElementById('image-description-input').value.trim();
+            if (!description) {
+                alert('Please enter an image description.');
+                return;
+            }
+
+            if (!adminState.currentImageData) {
+                alert('No image selected.');
+                return;
+            }
+
+            // Upload image to Drive first
+            const base64Data = adminState.currentImageData.split(',')[1];
+            const mimeType = adminState.currentImageData.split(';')[0].split(':')[1];
+            const fileName = `image_${adminState.currentImageIndex + 1}_${Date.now()}.${mimeType.split('/')[1]}`;
+
+            // Get folder ID for this lesson
+            google.script.run
+                .withSuccessHandler((folderResult) => {
+                    if (folderResult.success) {
+                        adminState.folderId = folderResult.folderId;
+
+                        // Upload the image
+                        google.script.run
+                            .withSuccessHandler((uploadResult) => {
+                                if (uploadResult.success) {
+                                    adminState.currentImage = {
+                                        description: description,
+                                        url: uploadResult.url,
+                                        index: adminState.currentImageIndex
+                                    };
+                                    showZoneEditor();
+                                } else {
+                                    alert('Error uploading image: ' + uploadResult.message);
+                                }
+                            })
+                            .withFailureHandler((error) => {
+                                alert('Error uploading image: ' + error.message);
+                            })
+                            .uploadImageToDrive(base64Data, mimeType, fileName, adminState.folderId);
+                    } else {
+                        alert('Error getting folder: ' + folderResult.message);
+                    }
+                })
+                .withFailureHandler((error) => {
+                    alert('Error: ' + error.message);
+                })
+                .createLessonFolder(adminState.currentLessonTitle);
+        }
+
+        /**
+         * Shows the zone editor
+         */
+        function showZoneEditor() {
+            document.getElementById('admin-image-manager').classList.add('hidden');
+            document.getElementById('admin-zone-editor').classList.remove('hidden');
+
+            document.getElementById('admin-zone-editor-title').textContent = 'Define Click Zones';
+            document.getElementById('admin-zone-editor-subtitle').textContent =
+                `${adminState.currentLessonTitle} - Image ${adminState.currentImageIndex + 1}: ${adminState.currentImage.description}`;
+
+            // Initialize canvas
+            adminState.canvas = document.getElementById('admin-canvas');
+            adminState.ctx = adminState.canvas.getContext('2d');
+            adminState.zones = [];
+
+            // Setup canvas event listeners
+            adminState.canvas.addEventListener('mousedown', handleAdminCanvasMouseDown);
+            adminState.canvas.addEventListener('mousemove', handleAdminCanvasMouseMove);
+            adminState.canvas.addEventListener('mouseup', handleAdminCanvasMouseUp);
+
+            // Load the image
+            loadAdminImage(adminState.currentImageData);
+            updateAdminZonesList();
+        }
+
+        /**
+         * Loads an image into the admin canvas
+         */
+        function loadAdminImage(dataUrl) {
+            const img = new Image();
+            img.onload = () => {
+                adminState.image = img;
+                const maxWidth = 800;
+                const aspectRatio = img.height / img.width;
+                adminState.canvas.width = Math.min(img.width, maxWidth);
+                adminState.canvas.height = adminState.canvas.width * aspectRatio;
+                redrawAdminCanvas();
+            };
+            img.onerror = () => {
+                alert('Failed to load image.');
+            };
+            img.src = dataUrl;
+        }
+
+        /**
+         * Redraws the admin canvas
+         */
+        function redrawAdminCanvas() {
+            if (!adminState.image) return;
+
+            const { ctx, canvas, image, zones, currentZone } = adminState;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+            zones.forEach((zone, index) => {
+                drawAdminZone(zone, index, false);
+            });
+
+            if (currentZone) {
+                drawAdminZone(currentZone, zones.length, true);
+            }
+        }
+
+        /**
+         * Draws a zone on the admin canvas
+         */
+        function drawAdminZone(zone, index, isTemporary) {
+            const { ctx, canvas } = adminState;
+
+            const x = (zone.x / 100) * canvas.width;
+            const y = (zone.y / 100) * canvas.height;
+            const width = (zone.width / 100) * canvas.width;
+            const height = (zone.height / 100) * canvas.height;
+
+            ctx.strokeStyle = isTemporary ? '#fbbf24' : '#3b82f6';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, width, height);
+
+            ctx.fillStyle = isTemporary ? 'rgba(251, 191, 36, 0.2)' : 'rgba(59, 130, 246, 0.2)';
+            ctx.fillRect(x, y, width, height);
+
+            if (zone.label) {
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 14px Inter, sans-serif';
+                ctx.fillText(zone.label, x + 5, y + 20);
+            }
+        }
+
+        /**
+         * Admin canvas mouse down handler
+         */
+        function handleAdminCanvasMouseDown(e) {
+            if (!adminState.image) return;
+
+            const rect = adminState.canvas.getBoundingClientRect();
+            const scaleX = adminState.canvas.width / rect.width;
+            const scaleY = adminState.canvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+
+            adminState.isDrawing = true;
+            adminState.startX = x;
+            adminState.startY = y;
+            adminState.currentZone = null;
+        }
+
+        /**
+         * Admin canvas mouse move handler
+         */
+        function handleAdminCanvasMouseMove(e) {
+            if (!adminState.isDrawing || !adminState.image) return;
+
+            const rect = adminState.canvas.getBoundingClientRect();
+            const scaleX = adminState.canvas.width / rect.width;
+            const scaleY = adminState.canvas.height / rect.height;
+            const currentX = (e.clientX - rect.left) * scaleX;
+            const currentY = (e.clientY - rect.top) * scaleY;
+
+            const x = Math.min(adminState.startX, currentX);
+            const y = Math.min(adminState.startY, currentY);
+            const width = Math.abs(currentX - adminState.startX);
+            const height = Math.abs(currentY - adminState.startY);
+
+            adminState.currentZone = {
+                x: (x / adminState.canvas.width) * 100,
+                y: (y / adminState.canvas.height) * 100,
+                width: (width / adminState.canvas.width) * 100,
+                height: (height / adminState.canvas.height) * 100,
+                label: ''
+            };
+
+            redrawAdminCanvas();
+        }
+
+        /**
+         * Admin canvas mouse up handler
+         */
+        function handleAdminCanvasMouseUp(e) {
+            if (!adminState.isDrawing || !adminState.image) return;
+
+            adminState.isDrawing = false;
+
+            if (adminState.currentZone &&
+                adminState.currentZone.width > 1 &&
+                adminState.currentZone.height > 1) {
+
+                const label = prompt('Enter a label for this zone (optional):') || '';
+                adminState.currentZone.label = label;
+
+                adminState.currentZone.x = Math.round(adminState.currentZone.x * 100) / 100;
+                adminState.currentZone.y = Math.round(adminState.currentZone.y * 100) / 100;
+                adminState.currentZone.width = Math.round(adminState.currentZone.width * 100) / 100;
+                adminState.currentZone.height = Math.round(adminState.currentZone.height * 100) / 100;
+
+                adminState.zones.push(adminState.currentZone);
+                updateAdminZonesList();
+            }
+
+            adminState.currentZone = null;
+            redrawAdminCanvas();
+        }
+
+        /**
+         * Updates the admin zones list
+         */
+        function updateAdminZonesList() {
+            const zonesList = document.getElementById('admin-zones-list');
+
+            if (adminState.zones.length === 0) {
+                zonesList.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">No zones defined yet.</p>';
+                return;
+            }
+
+            zonesList.innerHTML = adminState.zones.map((zone, index) => `
+                <div class="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg flex justify-between items-start">
+                    <div class="flex-1">
+                        <div class="font-semibold text-sm">${zone.label || `Zone ${index + 1}`}</div>
+                        <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                            x: ${zone.x}%, y: ${zone.y}%<br>
+                            w: ${zone.width}%, h: ${zone.height}%
+                        </div>
+                    </div>
+                    <button onclick="deleteAdminZone(${index})" class="ml-2 px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">
+                        Delete
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        /**
+         * Deletes a zone from admin zones list
+         */
+        function deleteAdminZone(index) {
+            adminState.zones.splice(index, 1);
+            updateAdminZonesList();
+            redrawAdminCanvas();
+        }
+
+        /**
+         * Saves zones and returns to image manager
+         */
+        function saveAdminZones() {
+            const zonesJson = JSON.stringify(adminState.zones);
+
+            google.script.run
+                .withSuccessHandler((result) => {
+                    if (result.success) {
+                        alert('Zones saved successfully!');
+                        adminState.currentImageIndex++;
+                        showImageManager(adminState.currentLessonTitle);
+                    } else {
+                        alert('Error saving zones: ' + result.message);
+                    }
+                })
+                .withFailureHandler((error) => {
+                    alert('Error saving zones: ' + error.message);
+                })
+                .updateLessonImage(
+                    adminState.currentLessonTitle,
+                    adminState.currentImage.index,
+                    adminState.currentImage.description,
+                    adminState.currentImage.url,
+                    zonesJson
+                );
+        }
+
+        /**
+         * Edits zones for an existing image
+         */
+        function editImageZones(imageIndex) {
+            // Load the image data and show zone editor
+            google.script.run
+                .withSuccessHandler((result) => {
+                    if (result.success) {
+                        const image = result.data.images[imageIndex];
+                        adminState.currentImage = image;
+                        adminState.currentImageIndex = imageIndex;
+
+                        // Parse existing zones
+                        try {
+                            adminState.zones = JSON.parse(image.zones || '[]');
+                        } catch (e) {
+                            adminState.zones = [];
+                        }
+
+                        // Fetch the image as base64 and show zone editor
+                        google.script.run
+                            .withSuccessHandler((base64DataUrl) => {
+                                if (base64DataUrl) {
+                                    adminState.currentImageData = base64DataUrl;
+                                    showZoneEditor();
+                                }
+                            })
+                            .getImageAsBase64(image.url);
+                    }
+                })
+                .getLessonForEditing(adminState.currentLessonTitle);
+        }
+
+        // Event listeners for admin buttons
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('lesson-setup-button')?.addEventListener('click', showAdminLogin);
+            document.getElementById('admin-login-btn')?.addEventListener('click', handleAdminLogin);
+            document.getElementById('admin-login-cancel')?.addEventListener('click', hideAdminLogin);
+            document.getElementById('admin-create-lesson-btn')?.addEventListener('click', showCreateLessonForm);
+            document.getElementById('admin-save-lesson-btn')?.addEventListener('click', saveLesson);
+            document.getElementById('admin-cancel-lesson-btn')?.addEventListener('click', showAdminLessonList);
+            document.getElementById('admin-back-to-main')?.addEventListener('click', () => {
+                document.getElementById('admin-view').classList.add('hidden');
+                landingPage.style.display = 'block';
+            });
+            document.getElementById('admin-back-to-lesson-list')?.addEventListener('click', showAdminLessonList);
+            document.getElementById('clear-image-btn')?.addEventListener('click', clearImage);
+            document.getElementById('save-and-define-zones-btn')?.addEventListener('click', saveAndDefineZones);
+            document.getElementById('admin-clear-zones')?.addEventListener('click', () => {
+                if (confirm('Clear all zones?')) {
+                    adminState.zones = [];
+                    updateAdminZonesList();
+                    redrawAdminCanvas();
+                }
+            });
+            document.getElementById('admin-save-zones-btn')?.addEventListener('click', saveAdminZones);
+            document.getElementById('admin-back-to-images')?.addEventListener('click', () => {
+                showImageManager(adminState.currentLessonTitle);
+            });
+
+            // Handle Enter key in login form
+            document.getElementById('admin-password')?.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    handleAdminLogin();
+                }
+            });
+        });
     </script>
 </body>
 </html>
