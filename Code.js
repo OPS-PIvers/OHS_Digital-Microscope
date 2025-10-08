@@ -3,7 +3,7 @@
  * You can find this URL by going to Extensions > Apps Script > Deploy > Manage Deployments
  * It should look like: https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec
  */
-const WEB_APP_URL = 'YOUR_WEB_APP_URL_HERE';
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwbFFzzKeOZRxuMfMd3kOCrHqA35ZlKDmnyXcztUcoFNhQ4lWj-QugEnri5aMKNdiaE8A/exec';
 
 /**
  * Creates a custom menu when the spreadsheet opens.
