@@ -26,6 +26,10 @@
             position: absolute;
             top: 0;
             left: 0;
+            transform-origin: center center;
+        }
+        .microscope-image.adjusting-focus {
+            transition: filter 0.15s ease-out, transform 0.15s ease-out;
         }
         .blur-in {
             filter: blur(8px);
@@ -585,9 +589,14 @@
                             : Math.floor(Math.random() * 30) + 60; // 60-90 range
                         focusSlider.value = randomStart;
 
-                        // Apply initial blur based on random position
+                        // Apply initial blur and scale based on random position
                         const initialBlur = calculateBlurAmount(randomStart);
+                        const initialScale = calculateScale(randomStart);
                         mainImage.style.filter = `blur(${initialBlur}px)`;
+                        mainImage.style.transform = `scale(${initialScale})`;
+
+                        // Add class for faster transitions during adjustment
+                        mainImage.classList.add('adjusting-focus');
 
                         focusSliderContainer.classList.add('visible');
 
@@ -617,46 +626,67 @@
         }
 
         /**
-         * Updates the image blur based on slider position.
+         * Calculates the scale transformation based on slider position.
+         * The optimal scale is 1.0 at position 50.
+         * Moving away from 50 changes the scale (too small or too large).
+         */
+        function calculateScale(sliderValue) {
+            const normalizedValue = sliderValue / 100; // 0 to 1
+            const optimalNormalized = optimalFocusValue / 100; // 0.5
+
+            // Create a parabolic curve where:
+            // - At slider=0: scale=0.7 (too small/far away)
+            // - At slider=50: scale=1.0 (perfect size)
+            // - At slider=100: scale=1.4 (too large/too close)
+
+            // Use a parabola: scale = a(x - 0.5)² + 1.0
+            // We want it to reach 0.7 at x=0 and 1.4 at x=1
+            const a = 1.6; // Coefficient that controls curve steepness
+            const scale = 1.0 - a * Math.pow(normalizedValue - optimalNormalized, 2);
+
+            // Adjust to get desired range
+            // When x=0: 1.0 - 1.6(0.5)² = 1.0 - 0.4 = 0.6
+            // When x=0.5: 1.0 - 1.6(0)² = 1.0
+            // When x=1: 1.0 - 1.6(0.5)² = 1.0 - 0.4 = 0.6
+
+            // Actually, let's use a different approach for asymmetric scaling
+            if (sliderValue < optimalFocusValue) {
+                // Below optimal: scale from 0.65 to 1.0
+                const t = sliderValue / optimalFocusValue; // 0 to 1
+                return 0.65 + (0.35 * t);
+            } else {
+                // Above optimal: scale from 1.0 to 1.5
+                const t = (sliderValue - optimalFocusValue) / (100 - optimalFocusValue); // 0 to 1
+                return 1.0 + (0.5 * t);
+            }
+        }
+
+        /**
+         * Updates the image blur and scale based on slider position.
+         * Also manages zone visibility - zones only appear when perfectly focused.
          */
         function updateFocusBlur() {
             if (!awaitingFocusAdjustment) return;
 
             const blurAmount = calculateBlurAmount(focusSlider.value);
+            const scale = calculateScale(focusSlider.value);
+
+            // Apply both blur and scale transformations
             mainImage.style.filter = `blur(${blurAmount}px)`;
+            mainImage.style.transform = `scale(${scale})`;
 
             // Check if student found optimal focus
             const distance = Math.abs(focusSlider.value - optimalFocusValue);
-            if (distance <= 5) {
-                // Student found the focus! After a short delay, lock it in
-                setTimeout(() => {
-                    if (!awaitingFocusAdjustment) return; // Check if still in focus mode
-
-                    const currentDistance = Math.abs(focusSlider.value - optimalFocusValue);
-                    if (currentDistance <= 5) {
-                        // Still in focus, lock it
-                        completeFocusAdjustment();
-                    }
-                }, 800); // Give them a moment to appreciate the sharp image
-            }
-        }
-
-        /**
-         * Completes the focus adjustment and enables zones.
-         */
-        function completeFocusAdjustment() {
-            if (!awaitingFocusAdjustment) return;
-
-            awaitingFocusAdjustment = false;
-            focusSliderContainer.classList.remove('visible');
-
-            // Ensure image is sharp
-            mainImage.style.filter = 'blur(0px)';
-            mainImage.classList.remove('zoom-out-blurry');
-
-            // Create zones for the new view
             const currentView = currentLessonViews[currentViewIndex];
-            createZoneOverlays(currentView.zones);
+
+            if (distance <= 5) {
+                // Within optimal range - show zones
+                createZoneOverlays(currentView.zones);
+            } else {
+                // Out of focus - hide zones
+                zonesOverlay.innerHTML = '';
+                simulationContainer.classList.remove('has-zones');
+            }
         }
 
         /**
@@ -673,6 +703,7 @@
             focusSliderContainer.classList.remove('visible');
             mainImage.className = 'w-full h-full object-contain microscope-image';
             mainImage.style.filter = ''; // Clear any blur
+            mainImage.style.transform = ''; // Clear any scale
             simulationContainer.style.backgroundColor = '';
 
             instructionText.textContent = view.description;
@@ -723,6 +754,8 @@
             awaitingFocusAdjustment = false;
             focusSliderContainer.classList.remove('visible');
             mainImage.style.filter = ''; // Clear blur
+            mainImage.style.transform = ''; // Clear scale
+            mainImage.classList.remove('adjusting-focus');
         });
 
         // --- INITIALIZATION ---
