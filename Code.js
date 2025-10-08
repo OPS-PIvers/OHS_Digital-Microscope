@@ -1,4 +1,11 @@
 /**
+ * CONFIGURATION: Replace this with your actual deployed web app URL
+ * You can find this URL by going to Extensions > Apps Script > Deploy > Manage Deployments
+ * It should look like: https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec
+ */
+const WEB_APP_URL = 'YOUR_WEB_APP_URL_HERE';
+
+/**
  * Creates a custom menu when the spreadsheet opens.
  * This menu provides quick access to the web app and coordinate helper tool.
  */
@@ -16,7 +23,7 @@ function onOpen() {
  * Opens the live web app in a new browser tab.
  */
 function openWebApp() {
-  const url = ScriptApp.getService().getUrl();
+  const url = WEB_APP_URL;
   const html = `<script>window.open('${url}', '_blank');google.script.host.close();</script>`;
   SpreadsheetApp.getUi().showModalDialog(
     HtmlService.createHtmlOutput(html).setWidth(100).setHeight(50),
@@ -28,7 +35,7 @@ function openWebApp() {
  * Opens the web app with coordinate helper mode enabled.
  */
 function openCoordinateHelper() {
-  const url = ScriptApp.getService().getUrl() + '?tool=coordinates';
+  const url = WEB_APP_URL + '?tool=coordinates';
   const html = `<script>window.open('${url}', '_blank');google.script.host.close();</script>`;
   SpreadsheetApp.getUi().showModalDialog(
     HtmlService.createHtmlOutput(html).setWidth(100).setHeight(50),
@@ -40,7 +47,7 @@ function openCoordinateHelper() {
  * Displays the web app URL in a dialog for easy copying.
  */
 function showWebAppUrl() {
-  const url = ScriptApp.getService().getUrl();
+  const url = WEB_APP_URL;
   const html = `
     <div style="font-family: Arial, sans-serif; padding: 10px;">
       <p><strong>Web App URL:</strong></p>

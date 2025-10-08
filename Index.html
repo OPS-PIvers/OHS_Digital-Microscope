@@ -466,7 +466,16 @@
         window.addEventListener('load', () => {
             // Check if we're in coordinate helper mode
             const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('tool') === 'coordinates') {
+            const toolParam = urlParams.get('tool');
+
+            // Debug logging
+            console.log('URL Search String:', window.location.search);
+            console.log('Tool Parameter:', toolParam);
+            console.log('Full URL:', window.location.href);
+
+            // Check both URLSearchParams and direct string matching as fallback
+            if (toolParam === 'coordinates' || window.location.href.includes('tool=coordinates')) {
+                console.log('Coordinate Helper Mode Detected - Initializing...');
                 initializeCoordinateHelper();
                 return;
             }
@@ -510,17 +519,31 @@
             isDrawing: false,
             startX: 0,
             startY: 0,
-            currentZone: null
+            currentZone: null,
+            initialized: false // Guard to prevent duplicate initialization
         };
 
         /**
          * Initializes the coordinate helper tool view
          */
         function initializeCoordinateHelper() {
+            console.log('initializeCoordinateHelper() called');
+
+            // Check if already initialized to prevent duplicate event listeners
+            if (coordHelperState.initialized) {
+                console.log('Coordinate helper already initialized, skipping...');
+                return;
+            }
+
             // Hide other views and show coordinate helper
             landingPage.style.display = 'none';
             simulationView.style.display = 'none';
-            document.getElementById('coordinate-helper-view').classList.remove('hidden');
+
+            const coordHelperView = document.getElementById('coordinate-helper-view');
+            coordHelperView.classList.remove('hidden');
+            coordHelperView.style.display = 'block'; // Explicitly set display to override Tailwind
+
+            console.log('Coordinate helper view should now be visible');
 
             // Get DOM elements
             const imageUrlInput = document.getElementById('coord-image-url');
@@ -573,6 +596,10 @@
             canvas.addEventListener('mousedown', handleCanvasMouseDown);
             canvas.addEventListener('mousemove', handleCanvasMouseMove);
             canvas.addEventListener('mouseup', handleCanvasMouseUp);
+
+            // Mark as initialized
+            coordHelperState.initialized = true;
+            console.log('Coordinate helper initialization complete');
         }
 
         /**
