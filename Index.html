@@ -150,7 +150,60 @@
             </div>
         </div>
 
-        <!-- View 2: Simulation View (Initially Hidden) -->
+        <!-- View 2: Coordinate Helper (Initially Hidden) -->
+        <div id="coordinate-helper-view" class="hidden">
+            <header class="text-center mb-4">
+                <h1 class="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400">📍 Coordinate Helper Tool</h1>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Define clickable zones for your anatomy images</p>
+            </header>
+
+            <div class="mb-4">
+                <label class="block text-sm font-semibold mb-2">Image URL:</label>
+                <input type="text" id="coord-image-url" placeholder="Paste Google Drive or direct image URL here..."
+                       class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button id="load-coord-image" class="mt-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-all">
+                    Load Image
+                </button>
+            </div>
+
+            <div id="coord-canvas-container" class="hidden">
+                <div class="mb-4">
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                        <strong>Instructions:</strong> Click and drag on the image to create rectangular zones. Each zone will be assigned coordinates as percentages.
+                    </p>
+                </div>
+
+                <div class="relative w-full max-w-3xl mx-auto bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden border-2 border-gray-300 dark:border-gray-600" id="canvas-wrapper">
+                    <canvas id="coord-canvas" class="w-full cursor-crosshair"></canvas>
+                </div>
+
+                <div class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <!-- Zone List -->
+                    <div>
+                        <h3 class="font-bold text-lg mb-2">Defined Zones:</h3>
+                        <div id="zones-list" class="space-y-2 max-h-64 overflow-y-auto">
+                            <p class="text-sm text-gray-500 dark:text-gray-400">No zones defined yet. Click and drag on the image to create zones.</p>
+                        </div>
+                    </div>
+
+                    <!-- JSON Output -->
+                    <div>
+                        <h3 class="font-bold text-lg mb-2">JSON Output:</h3>
+                        <textarea id="json-output" readonly
+                                  class="w-full h-32 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 font-mono text-xs resize-none"
+                                  placeholder="[]"></textarea>
+                        <button id="copy-json" class="mt-2 px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-all">
+                            📋 Copy JSON
+                        </button>
+                        <button id="clear-zones" class="mt-2 px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-all">
+                            🗑️ Clear All Zones
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- View 3: Simulation View (Initially Hidden) -->
         <div id="simulation-view" class="hidden">
             <header class="text-center mb-4">
                  <h1 id="lesson-title" class="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400"></h1>
@@ -411,6 +464,13 @@
 
         // --- INITIALIZATION ---
         window.addEventListener('load', () => {
+            // Check if we're in coordinate helper mode
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('tool') === 'coordinates') {
+                initializeCoordinateHelper();
+                return;
+            }
+
             // Run the diagnostic test first
             loaderContainer.innerHTML = `<div class="loader"></div><p class="mt-2 text-sm text-gray-500">Running diagnostics...</p>`;
             google.script.run.withSuccessHandler(showDiagnosticResult).diagnoseSpreadsheetAccess();
@@ -436,6 +496,287 @@
                     </div>`;
                 lessonCardsContainer.style.display = 'none'; // Hide the card container
             }
+        }
+
+        // ==============================
+        // COORDINATE HELPER FUNCTIONALITY
+        // ==============================
+
+        let coordHelperState = {
+            canvas: null,
+            ctx: null,
+            image: null,
+            zones: [],
+            isDrawing: false,
+            startX: 0,
+            startY: 0,
+            currentZone: null
+        };
+
+        /**
+         * Initializes the coordinate helper tool view
+         */
+        function initializeCoordinateHelper() {
+            // Hide other views and show coordinate helper
+            landingPage.style.display = 'none';
+            simulationView.style.display = 'none';
+            document.getElementById('coordinate-helper-view').classList.remove('hidden');
+
+            // Get DOM elements
+            const imageUrlInput = document.getElementById('coord-image-url');
+            const loadImageBtn = document.getElementById('load-coord-image');
+            const canvasContainer = document.getElementById('coord-canvas-container');
+            const canvas = document.getElementById('coord-canvas');
+            const copyJsonBtn = document.getElementById('copy-json');
+            const clearZonesBtn = document.getElementById('clear-zones');
+
+            coordHelperState.canvas = canvas;
+            coordHelperState.ctx = canvas.getContext('2d');
+
+            // Load image button handler
+            loadImageBtn.addEventListener('click', () => {
+                const url = imageUrlInput.value.trim();
+                if (!url) {
+                    alert('Please enter an image URL');
+                    return;
+                }
+                loadCoordinateImage(url, canvasContainer);
+            });
+
+            // Copy JSON button handler
+            copyJsonBtn.addEventListener('click', () => {
+                const jsonOutput = document.getElementById('json-output');
+                jsonOutput.select();
+                document.execCommand('copy');
+
+                // Visual feedback
+                const originalText = copyJsonBtn.textContent;
+                copyJsonBtn.textContent = '✓ Copied!';
+                copyJsonBtn.classList.add('bg-green-700');
+                setTimeout(() => {
+                    copyJsonBtn.textContent = originalText;
+                    copyJsonBtn.classList.remove('bg-green-700');
+                }, 2000);
+            });
+
+            // Clear zones button handler
+            clearZonesBtn.addEventListener('click', () => {
+                if (confirm('Are you sure you want to clear all zones?')) {
+                    coordHelperState.zones = [];
+                    redrawCanvas();
+                    updateZonesList();
+                    updateJsonOutput();
+                }
+            });
+
+            // Canvas mouse event handlers
+            canvas.addEventListener('mousedown', handleCanvasMouseDown);
+            canvas.addEventListener('mousemove', handleCanvasMouseMove);
+            canvas.addEventListener('mouseup', handleCanvasMouseUp);
+        }
+
+        /**
+         * Loads an image into the coordinate helper canvas
+         */
+        function loadCoordinateImage(url, canvasContainer) {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+
+            img.onload = () => {
+                coordHelperState.image = img;
+
+                // Set canvas size to match image aspect ratio
+                const maxWidth = 800;
+                const aspectRatio = img.height / img.width;
+                coordHelperState.canvas.width = Math.min(img.width, maxWidth);
+                coordHelperState.canvas.height = coordHelperState.canvas.width * aspectRatio;
+
+                // Show canvas container
+                canvasContainer.classList.remove('hidden');
+
+                // Draw image
+                redrawCanvas();
+            };
+
+            img.onerror = () => {
+                alert('Failed to load image. Make sure the URL is correct and accessible.');
+            };
+
+            img.src = url;
+        }
+
+        /**
+         * Redraws the canvas with the image and all zones
+         */
+        function redrawCanvas() {
+            if (!coordHelperState.image) return;
+
+            const { ctx, canvas, image, zones, currentZone } = coordHelperState;
+
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw image
+            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+            // Draw all saved zones
+            zones.forEach((zone, index) => {
+                drawZone(zone, index, false);
+            });
+
+            // Draw current zone being drawn
+            if (currentZone) {
+                drawZone(currentZone, zones.length, true);
+            }
+        }
+
+        /**
+         * Draws a single zone rectangle on the canvas
+         */
+        function drawZone(zone, index, isTemporary) {
+            const { ctx, canvas } = coordHelperState;
+
+            // Convert percentages to pixels
+            const x = (zone.x / 100) * canvas.width;
+            const y = (zone.y / 100) * canvas.height;
+            const width = (zone.width / 100) * canvas.width;
+            const height = (zone.height / 100) * canvas.height;
+
+            // Draw rectangle
+            ctx.strokeStyle = isTemporary ? '#fbbf24' : '#3b82f6';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, width, height);
+
+            // Draw semi-transparent fill
+            ctx.fillStyle = isTemporary ? 'rgba(251, 191, 36, 0.2)' : 'rgba(59, 130, 246, 0.2)';
+            ctx.fillRect(x, y, width, height);
+
+            // Draw label
+            if (zone.label) {
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 14px Inter, sans-serif';
+                ctx.fillText(zone.label, x + 5, y + 20);
+            }
+        }
+
+        /**
+         * Handles mouse down event on canvas
+         */
+        function handleCanvasMouseDown(e) {
+            if (!coordHelperState.image) return;
+
+            const rect = coordHelperState.canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            coordHelperState.isDrawing = true;
+            coordHelperState.startX = x;
+            coordHelperState.startY = y;
+            coordHelperState.currentZone = null;
+        }
+
+        /**
+         * Handles mouse move event on canvas
+         */
+        function handleCanvasMouseMove(e) {
+            if (!coordHelperState.isDrawing || !coordHelperState.image) return;
+
+            const rect = coordHelperState.canvas.getBoundingClientRect();
+            const currentX = e.clientX - rect.left;
+            const currentY = e.clientY - rect.top;
+
+            // Calculate zone in percentages
+            const x = Math.min(coordHelperState.startX, currentX);
+            const y = Math.min(coordHelperState.startY, currentY);
+            const width = Math.abs(currentX - coordHelperState.startX);
+            const height = Math.abs(currentY - coordHelperState.startY);
+
+            coordHelperState.currentZone = {
+                x: (x / coordHelperState.canvas.width) * 100,
+                y: (y / coordHelperState.canvas.height) * 100,
+                width: (width / coordHelperState.canvas.width) * 100,
+                height: (height / coordHelperState.canvas.height) * 100,
+                label: ''
+            };
+
+            redrawCanvas();
+        }
+
+        /**
+         * Handles mouse up event on canvas
+         */
+        function handleCanvasMouseUp(e) {
+            if (!coordHelperState.isDrawing || !coordHelperState.image) return;
+
+            coordHelperState.isDrawing = false;
+
+            // Only save zones with meaningful size
+            if (coordHelperState.currentZone &&
+                coordHelperState.currentZone.width > 1 &&
+                coordHelperState.currentZone.height > 1) {
+
+                // Prompt for label
+                const label = prompt('Enter a label for this zone (optional):') || '';
+                coordHelperState.currentZone.label = label;
+
+                // Round to 2 decimal places
+                coordHelperState.currentZone.x = Math.round(coordHelperState.currentZone.x * 100) / 100;
+                coordHelperState.currentZone.y = Math.round(coordHelperState.currentZone.y * 100) / 100;
+                coordHelperState.currentZone.width = Math.round(coordHelperState.currentZone.width * 100) / 100;
+                coordHelperState.currentZone.height = Math.round(coordHelperState.currentZone.height * 100) / 100;
+
+                coordHelperState.zones.push(coordHelperState.currentZone);
+                updateZonesList();
+                updateJsonOutput();
+            }
+
+            coordHelperState.currentZone = null;
+            redrawCanvas();
+        }
+
+        /**
+         * Updates the zones list display
+         */
+        function updateZonesList() {
+            const zonesList = document.getElementById('zones-list');
+
+            if (coordHelperState.zones.length === 0) {
+                zonesList.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">No zones defined yet. Click and drag on the image to create zones.</p>';
+                return;
+            }
+
+            zonesList.innerHTML = coordHelperState.zones.map((zone, index) => `
+                <div class="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg flex justify-between items-start">
+                    <div class="flex-1">
+                        <div class="font-semibold text-sm">${zone.label || `Zone ${index + 1}`}</div>
+                        <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                            x: ${zone.x}%, y: ${zone.y}%<br>
+                            w: ${zone.width}%, h: ${zone.height}%
+                        </div>
+                    </div>
+                    <button onclick="deleteZone(${index})" class="ml-2 px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">
+                        Delete
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        /**
+         * Deletes a zone by index
+         */
+        function deleteZone(index) {
+            coordHelperState.zones.splice(index, 1);
+            updateZonesList();
+            updateJsonOutput();
+            redrawCanvas();
+        }
+
+        /**
+         * Updates the JSON output textarea
+         */
+        function updateJsonOutput() {
+            const jsonOutput = document.getElementById('json-output');
+            jsonOutput.value = JSON.stringify(coordHelperState.zones, null, 2);
         }
     </script>
 </body>
