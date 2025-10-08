@@ -66,9 +66,19 @@ function showWebAppUrl() {
 /**
  * Serves the main HTML page of the web app.
  * This is the primary function that runs when the web app URL is visited.
+ * Reads the 'tool' parameter to determine which mode to load (e.g., ?tool=coordinates)
  */
 function doGet(e) {
-  return HtmlService.createHtmlOutputFromFile('Index.html')
+  // Get the tool parameter from the URL (e.g., ?tool=coordinates)
+  const toolMode = e && e.parameter && e.parameter.tool ? e.parameter.tool : '';
+
+  // Create a template instead of static HTML
+  const template = HtmlService.createTemplateFromFile('Index.html');
+
+  // Inject the tool mode as a variable that will be available in the HTML
+  template.toolMode = toolMode;
+
+  return template.evaluate()
     .setTitle('Interactive Anatomy Lab');
 }
 
@@ -178,14 +188,22 @@ function getLessonData(lessonName) {
         // Parse zones JSON if it exists
         if (zonesData && zonesData.toString().trim() !== "") {
           try {
+            Logger.log(`Attempting to parse zones for view ${Math.floor(i / 3)}: "${zonesData.toString()}"`);
             const parsedZones = JSON.parse(zonesData);
             if (Array.isArray(parsedZones)) {
               viewObject.zones = parsedZones;
+              Logger.log(`Successfully parsed ${parsedZones.length} zones for view ${Math.floor(i / 3)}`);
+            } else {
+              Logger.log(`Warning: Zones data is not an array for view ${Math.floor(i / 3)}. Type: ${typeof parsedZones}`);
             }
           } catch (e) {
-            Logger.log(`Warning: Could not parse zones JSON for view ${i}: ${e.toString()}`);
+            Logger.log(`ERROR: Could not parse zones JSON for view ${Math.floor(i / 3)}`);
+            Logger.log(`  Raw data: "${zonesData.toString()}"`);
+            Logger.log(`  Error: ${e.toString()}`);
             // Continue with empty zones array
           }
+        } else {
+          Logger.log(`No zones data for view ${Math.floor(i / 3)}`);
         }
 
         views.push(viewObject);
@@ -195,6 +213,88 @@ function getLessonData(lessonName) {
   } catch (error) {
     Logger.log(error.toString());
     return []; // Return an empty array on error
+  }
+}
+
+/**
+ * Gets lesson data optimized for the coordinate helper tool.
+ * Returns all images for a lesson with their URLs already converted for Drive compatibility.
+ * @param {string} lessonName The name of the lesson to retrieve.
+ * @returns {Array<Object>} An array of image objects with url, description, and index.
+ */
+function getLessonDataForCoordinates(lessonName) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Lesson Database");
+    if (!sheet) {
+      throw new Error("'Lesson Database' sheet not found.");
+    }
+
+    const data = sheet.getDataRange().getValues();
+    const headers = data.shift(); // Remove header row
+
+    // Find the row that matches the selected lessonName
+    const lessonRow = data.find(row => row[0] === lessonName);
+
+    if (!lessonRow) {
+      return []; // Return empty if lesson not found
+    }
+
+    const images = [];
+    // Iterate through the columns by steps of 3 (Description, URL, Zones)
+    // Starting from column B (index 1)
+    for (let i = 1; i < lessonRow.length; i += 3) {
+      const description = lessonRow[i];
+      const imageUrl = convertGoogleDriveUrl(lessonRow[i + 1]); // Convert the URL here
+
+      // Only add the image if both the description and URL are not blank
+      if (description && imageUrl && description.toString().trim() !== "" && imageUrl.toString().trim() !== "") {
+        images.push({
+          index: Math.floor(i / 3), // Calculate view index (0-based)
+          description: description,
+          imageUrl: imageUrl
+        });
+      }
+    }
+    return images;
+  } catch (error) {
+    Logger.log(error.toString());
+    return []; // Return an empty array on error
+  }
+}
+
+/**
+ * Fetches an image from a URL and returns it as a base64-encoded data URL.
+ * This bypasses CORS restrictions for canvas operations.
+ * @param {string} url The image URL to fetch.
+ * @returns {string} Base64-encoded data URL, or null on error.
+ */
+function getImageAsBase64(url) {
+  try {
+    // Fetch the image
+    const response = UrlFetchApp.fetch(url, {
+      muteHttpExceptions: true
+    });
+
+    if (response.getResponseCode() !== 200) {
+      Logger.log(`Failed to fetch image: ${response.getResponseCode()}`);
+      return null;
+    }
+
+    // Get the image blob
+    const blob = response.getBlob();
+
+    // Convert to base64
+    const base64 = Utilities.base64Encode(blob.getBytes());
+
+    // Get the content type (e.g., image/jpeg, image/png)
+    const contentType = blob.getContentType();
+
+    // Return as data URL
+    return `data:${contentType};base64,${base64}`;
+
+  } catch (error) {
+    Logger.log(`Error fetching image as base64: ${error.toString()}`);
+    return null;
   }
 }
 

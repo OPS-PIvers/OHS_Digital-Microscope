@@ -23,6 +23,9 @@
         }
         .microscope-image {
             transition: filter 0.8s ease-in-out, transform 1.2s ease-in-out;
+            position: absolute;
+            top: 0;
+            left: 0;
         }
         .blur-in {
             filter: blur(8px);
@@ -34,6 +37,7 @@
             filter: blur(15px);
         }
         .zoom-out-blurry {
+            transform: scale(1.5);
             filter: blur(12px);
             opacity: 0.7;
         }
@@ -41,6 +45,18 @@
             filter: blur(0px);
             opacity: 1;
             transition: filter 1.5s ease-out, opacity 0.8s ease-out;
+        }
+
+        /* Crossfade transition styles */
+        .crossfade-out {
+            opacity: 0;
+            filter: blur(15px);
+            transition: opacity 0.8s ease-in-out, filter 0.8s ease-in-out;
+            pointer-events: none;
+        }
+        .crossfade-in {
+            opacity: 1;
+            transition: opacity 0.8s ease-in-out;
         }
 
         /* Clickable zone styles */
@@ -78,37 +94,92 @@
             transform: translateX(-50%) translateY(-12px);
         }
 
-        /* Adjust focus button */
-        #adjust-focus-button {
+        /* Focus slider */
+        #focus-slider-container {
             position: absolute;
+            right: 20px;
             top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+            transform: translateY(-50%);
             z-index: 100;
-            padding: 16px 32px;
-            font-size: 18px;
-            font-weight: 700;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
             display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
         }
-        #adjust-focus-button:hover {
-            transform: translate(-50%, -50%) scale(1.05);
-            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
-        }
-        #adjust-focus-button.visible {
-            display: block;
-            animation: pulse 2s ease-in-out infinite;
+        #focus-slider-container.visible {
+            display: flex;
+            animation: slideIn 0.5s ease-out;
         }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.8; }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                right: -50px;
+            }
+            to {
+                opacity: 1;
+                right: 20px;
+            }
+        }
+
+        #focus-slider-label {
+            font-size: 14px;
+            font-weight: 700;
+            color: white;
+            background: rgba(0, 0, 0, 0.75);
+            padding: 8px 16px;
+            border-radius: 8px;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        #focus-slider {
+            -webkit-appearance: slider-vertical;
+            width: 8px;
+            height: 300px;
+            background: linear-gradient(to top,
+                #ef4444 0%,
+                #f59e0b 25%,
+                #10b981 45%,
+                #10b981 55%,
+                #f59e0b 75%,
+                #ef4444 100%);
+            border-radius: 8px;
+            outline: none;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        #focus-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+            border: 3px solid #667eea;
+            transition: transform 0.1s ease;
+        }
+
+        #focus-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        #focus-slider::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+            border: 3px solid #667eea;
+            transition: transform 0.1s ease;
+        }
+
+        #focus-slider::-moz-range-thumb:hover {
+            transform: scale(1.2);
         }
 
         .loader {
@@ -125,6 +196,7 @@
         }
         .lesson-card {
             transition: transform 0.3s ease, box-shadow 0.3s ease;
+            text-align: center;
         }
         .lesson-card:hover {
             transform: translateY(-5px);
@@ -134,7 +206,7 @@
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 flex items-center justify-center min-h-screen p-4">
 
-    <div class="w-full max-w-5xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-4 md:p-6 lg:p-8">
+    <div class="w-full max-w-5xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 lg:p-10">
 
         <!-- View 1: Landing Page -->
         <div id="landing-page">
@@ -152,21 +224,42 @@
 
         <!-- View 2: Coordinate Helper (Initially Hidden) -->
         <div id="coordinate-helper-view" class="hidden">
-            <header class="text-center mb-4">
-                <h1 class="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400">📍 Coordinate Helper Tool</h1>
-                <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Define clickable zones for your anatomy images</p>
-            </header>
 
-            <div class="mb-4">
-                <label class="block text-sm font-semibold mb-2">Image URL:</label>
-                <input type="text" id="coord-image-url" placeholder="Paste Google Drive or direct image URL here..."
-                       class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <button id="load-coord-image" class="mt-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-all">
-                    Load Image
+            <!-- Coordinate Helper Sub-View 1: Lesson Selection -->
+            <div id="coord-lesson-selection">
+                <header class="text-center mb-6">
+                    <h1 class="text-3xl md:text-4xl font-bold text-blue-600 dark:text-blue-400">📍 Coordinate Helper Tool</h1>
+                    <p class="text-md text-gray-600 dark:text-gray-400 mt-2">Select a lesson to add clickable zones</p>
+                </header>
+                <div id="coord-loader-container" class="flex justify-center items-center p-8">
+                    <div class="loader"></div>
+                </div>
+                <div id="coord-lesson-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Lesson cards will be injected here by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Coordinate Helper Sub-View 2: Image Selection -->
+            <div id="coord-image-selection" class="hidden">
+                <header class="text-center mb-4">
+                    <h1 id="coord-lesson-title" class="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400"></h1>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Select an image to define zones</p>
+                </header>
+                <div id="coord-images-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <!-- Image cards will be injected here by JavaScript -->
+                </div>
+                <button id="coord-back-to-lessons" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-all">
+                    ← Back to Lessons
                 </button>
             </div>
 
-            <div id="coord-canvas-container" class="hidden">
+            <!-- Coordinate Helper Sub-View 3: Canvas Editor -->
+            <div id="coord-canvas-editor" class="hidden">
+                <header class="text-center mb-4">
+                    <h1 id="coord-canvas-title" class="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400">Zone Editor</h1>
+                    <p id="coord-canvas-subtitle" class="text-sm text-gray-600 dark:text-gray-400 mt-1"></p>
+                </header>
+
                 <div class="mb-4">
                     <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
                         <strong>Instructions:</strong> Click and drag on the image to create rectangular zones. Each zone will be assigned coordinates as percentages.
@@ -189,23 +282,64 @@
                     <!-- JSON Output -->
                     <div>
                         <h3 class="font-bold text-lg mb-2">JSON Output:</h3>
-                        <textarea id="json-output" readonly
-                                  class="w-full h-32 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 font-mono text-xs resize-none"
-                                  placeholder="[]"></textarea>
-                        <button id="copy-json" class="mt-2 px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-all">
-                            📋 Copy JSON
-                        </button>
+
+                        <!-- Context Info -->
+                        <div id="coord-context-info" class="mb-3 p-2 bg-blue-50 dark:bg-blue-900 rounded text-xs">
+                            <strong>Lesson:</strong> <span id="json-lesson-name"></span><br>
+                            <strong>Image:</strong> <span id="json-image-index"></span> - <span id="json-image-desc"></span>
+                        </div>
+
+                        <!-- Zones Array (For Spreadsheet) -->
+                        <div class="mb-3">
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="text-sm font-bold text-green-700 dark:text-green-400">✅ Zones Array (Paste into Spreadsheet)</label>
+                                <button id="copy-zones-array" class="px-3 py-1 bg-green-600 text-white text-xs font-semibold rounded hover:bg-green-700 transition-all">
+                                    📋 Copy
+                                </button>
+                            </div>
+                            <textarea id="json-zones-array" readonly
+                                      class="w-full h-24 px-3 py-2 border-2 border-green-500 dark:border-green-600 rounded-lg bg-white dark:bg-gray-700 font-mono text-xs resize-none"
+                                      placeholder="[]"></textarea>
+                            <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                ⬆️ Copy this and paste into the <strong>Zones column</strong> of your spreadsheet
+                            </p>
+                        </div>
+
+                        <!-- Full Metadata (Reference) -->
+                        <div class="mb-3">
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="text-sm font-semibold text-gray-600 dark:text-gray-400">📄 Full Metadata (Reference Only)</label>
+                                <button id="copy-full-metadata" class="px-3 py-1 bg-gray-500 text-white text-xs font-semibold rounded hover:bg-gray-600 transition-all">
+                                    📋 Copy
+                                </button>
+                            </div>
+                            <textarea id="json-full-metadata" readonly
+                                      class="w-full h-24 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 font-mono text-xs resize-none"
+                                      placeholder="{}"></textarea>
+                        </div>
+
+                        <!-- Action Buttons -->
                         <button id="clear-zones" class="mt-2 px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-all">
                             🗑️ Clear All Zones
                         </button>
                     </div>
                 </div>
+
+                <div class="mt-4 flex gap-2">
+                    <button id="coord-back-to-images" class="px-6 py-2 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 transition-all">
+                        ← Back to Images
+                    </button>
+                    <button id="coord-back-to-lessons-from-canvas" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-all">
+                        ← Back to Lessons
+                    </button>
+                </div>
             </div>
+
         </div>
 
         <!-- View 3: Simulation View (Initially Hidden) -->
         <div id="simulation-view" class="hidden">
-            <header class="text-center mb-4">
+            <header class="text-center mb-6 px-4 md:px-6 lg:px-8">
                  <h1 id="lesson-title" class="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400"></h1>
                  <p id="instruction-text" class="text-md text-gray-600 dark:text-gray-400 mt-1 min-h-[24px]"></p>
             </header>
@@ -214,8 +348,12 @@
             </div>
             <div id="simulation-container" class="relative w-full max-w-3xl mx-auto aspect-video rounded-lg overflow-hidden shadow-inner border border-gray-200 dark:border-gray-700">
                 <img id="main-image" src="" alt="Anatomy diagram" class="w-full h-full object-contain microscope-image">
+                <img id="next-image" src="" alt="Next anatomy diagram" class="w-full h-full object-contain microscope-image" style="opacity: 0; pointer-events: none;">
                 <div id="zones-overlay"></div>
-                <button id="adjust-focus-button">🔬 Adjust Focus</button>
+                <div id="focus-slider-container">
+                    <div id="focus-slider-label">🔬 Adjust Focus</div>
+                    <input type="range" id="focus-slider" min="0" max="100" value="50" orient="vertical">
+                </div>
             </div>
             <div class="mt-4 flex justify-between items-center">
                  <button id="back-to-lessons-button" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all">
@@ -229,6 +367,9 @@
     </div>
 
     <script>
+        // Server-injected tool mode (from Apps Script doGet function)
+        const TOOL_MODE = '<?= toolMode ?>';
+
         // DOM Element References
         const landingPage = document.getElementById('landing-page');
         const simulationView = document.getElementById('simulation-view');
@@ -239,14 +380,17 @@
         const instructionText = document.getElementById('instruction-text');
         const simulationContainer = document.getElementById('simulation-container');
         const mainImage = document.getElementById('main-image');
+        const nextImage = document.getElementById('next-image');
         const backToLessonsButton = document.getElementById('back-to-lessons-button');
         const backButton = document.getElementById('back-button');
         const zonesOverlay = document.getElementById('zones-overlay');
-        const adjustFocusButton = document.getElementById('adjust-focus-button');
+        const focusSliderContainer = document.getElementById('focus-slider-container');
+        const focusSlider = document.getElementById('focus-slider');
 
         let currentLessonViews = [];
         let currentViewIndex = -1;
         let awaitingFocusAdjustment = false;
+        let optimalFocusValue = 50; // The "correct" slider position for sharp focus
 
         /**
          * Builds the lesson cards on the landing page.
@@ -265,7 +409,7 @@
                 card.className = 'lesson-card bg-gray-50 dark:bg-gray-700 rounded-lg shadow-md overflow-hidden cursor-pointer';
                 card.innerHTML = `
                     <img src="${lesson.previewImage || 'https://placehold.co/600x400/eeeeee/333333?text=No+Image'}" alt="${lesson.name}" class="w-full h-40 object-cover" onerror="this.src='https://placehold.co/600x400/eeeeee/333333?text=Image+Error'">
-                    <div class="p-4">
+                    <div class="p-6 text-center">
                         <h3 class="font-bold text-lg">${lesson.name}</h3>
                         <p class="text-gray-600 dark:text-gray-400 text-sm mt-1">${lesson.description || 'No description available.'}</p>
                     </div>
@@ -310,20 +454,62 @@
         function createZoneOverlays(zones) {
             zonesOverlay.innerHTML = ''; // Clear existing zones
 
+            console.log('createZoneOverlays called with zones:', zones);
+
             if (!zones || zones.length === 0) {
+                console.log('No zones to create');
                 simulationContainer.classList.remove('has-zones');
                 return;
             }
 
             simulationContainer.classList.add('has-zones');
+            console.log(`Creating ${zones.length} zone overlays`);
+
+            // Get the actual dimensions of the container and the image
+            const containerRect = simulationContainer.getBoundingClientRect();
+            const imageRect = mainImage.getBoundingClientRect();
+
+            // Calculate the offset and scale of the image within the container
+            // (due to object-contain, the image might be smaller and centered)
+            const offsetX = imageRect.left - containerRect.left;
+            const offsetY = imageRect.top - containerRect.top;
+            const imageWidth = imageRect.width;
+            const imageHeight = imageRect.height;
+            const containerWidth = containerRect.width;
+            const containerHeight = containerRect.height;
+
+            console.log('Container dimensions:', containerWidth, 'x', containerHeight);
+            console.log('Image dimensions:', imageWidth, 'x', imageHeight);
+            console.log('Image offset:', offsetX, ',', offsetY);
 
             zones.forEach((zone, index) => {
+                console.log(`Zone ${index}:`, zone);
+
                 const zoneDiv = document.createElement('div');
                 zoneDiv.className = 'clickable-zone';
-                zoneDiv.style.left = `${zone.x}%`;
-                zoneDiv.style.top = `${zone.y}%`;
-                zoneDiv.style.width = `${zone.width}%`;
-                zoneDiv.style.height = `${zone.height}%`;
+
+                // Calculate zone position relative to the actual image, not the container
+                // Zone percentages are relative to the image, so we need to:
+                // 1. Convert percentages to pixels relative to the image
+                // 2. Add the image offset within the container
+                // 3. Convert back to percentages relative to the container
+                const zoneLeftPx = (zone.x / 100) * imageWidth + offsetX;
+                const zoneTopPx = (zone.y / 100) * imageHeight + offsetY;
+                const zoneWidthPx = (zone.width / 100) * imageWidth;
+                const zoneHeightPx = (zone.height / 100) * imageHeight;
+
+                // Convert to percentages of the container
+                const zoneLeftPercent = (zoneLeftPx / containerWidth) * 100;
+                const zoneTopPercent = (zoneTopPx / containerHeight) * 100;
+                const zoneWidthPercent = (zoneWidthPx / containerWidth) * 100;
+                const zoneHeightPercent = (zoneHeightPx / containerHeight) * 100;
+
+                zoneDiv.style.left = `${zoneLeftPercent}%`;
+                zoneDiv.style.top = `${zoneTopPercent}%`;
+                zoneDiv.style.width = `${zoneWidthPercent}%`;
+                zoneDiv.style.height = `${zoneHeightPercent}%`;
+
+                console.log(`Zone ${index} positioned at: left=${zoneLeftPercent.toFixed(2)}%, top=${zoneTopPercent.toFixed(2)}%, width=${zoneWidthPercent.toFixed(2)}%, height=${zoneHeightPercent.toFixed(2)}%`);
 
                 // Add label tooltip
                 const label = document.createElement('div');
@@ -333,16 +519,19 @@
 
                 // Add click handler for zone
                 zoneDiv.addEventListener('click', (e) => {
+                    console.log(`Zone ${index} clicked!`);
                     e.stopPropagation();
                     zoomToNextView();
                 });
 
                 zonesOverlay.appendChild(zoneDiv);
             });
+
+            console.log('Zone overlays created successfully');
         }
 
         /**
-         * Performs the microscope zoom animation sequence.
+         * Performs the microscope zoom animation sequence with smooth crossfade.
          */
         function zoomToNextView() {
             if (currentViewIndex + 1 >= currentLessonViews.length) return;
@@ -351,56 +540,123 @@
             zonesOverlay.innerHTML = '';
             simulationContainer.classList.remove('has-zones');
 
-            // Phase 1: Zoom in and blur current image
-            mainImage.classList.add('zoom-in');
+            const nextView = currentLessonViews[currentViewIndex + 1];
 
-            setTimeout(() => {
-                // Phase 2: Brief dark transition
-                simulationContainer.style.backgroundColor = '#000';
-                mainImage.style.opacity = '0';
+            // Pre-apply the blurred zoom state to next image BEFORE loading
+            nextImage.classList.add('zoom-out-blurry');
+            nextImage.style.opacity = '0'; // Start invisible
+
+            // Preload the next image
+            nextImage.src = nextView.imageUrl;
+
+            nextImage.onload = () => {
+                // Phase 1: Start zoom and blur on current image
+                mainImage.classList.add('zoom-in');
 
                 setTimeout(() => {
-                    // Phase 3: Load next image blurry
-                    currentViewIndex++;
-                    const nextView = currentLessonViews[currentViewIndex];
-                    mainImage.src = nextView.imageUrl;
-                    instructionText.textContent = nextView.description;
+                    // Phase 2: Crossfade - current image fades out while blurring more
+                    // next image fades in (already blurred/zoomed from pre-applied class)
+                    mainImage.classList.add('crossfade-out');
+                    nextImage.classList.add('crossfade-in');
+                    nextImage.style.opacity = '1';
 
-                    mainImage.onload = () => {
-                        mainImage.classList.remove('zoom-in');
+                    setTimeout(() => {
+                        // Phase 3: Swap images - make next image the main image
+                        currentViewIndex++;
+                        instructionText.textContent = nextView.description;
+
+                        // Reset main image
+                        mainImage.src = nextView.imageUrl;
+                        mainImage.classList.remove('zoom-in', 'crossfade-out');
                         mainImage.classList.add('zoom-out-blurry');
                         mainImage.style.opacity = '1';
-                        simulationContainer.style.backgroundColor = '';
 
-                        // Show adjust focus button
+                        // Hide and reset next image
+                        nextImage.style.opacity = '0';
+                        nextImage.classList.remove('crossfade-in', 'zoom-out-blurry');
+
+                        // Show focus slider and randomize starting position
                         awaitingFocusAdjustment = true;
-                        adjustFocusButton.classList.add('visible');
-                    };
 
-                    backButton.classList.toggle('hidden', currentViewIndex === 0);
-                }, 500);
-            }, 1200);
+                        // Set slider to random position (avoiding the optimal zone)
+                        // This simulates starting with an unfocused microscope
+                        const randomStart = Math.random() > 0.5
+                            ? Math.floor(Math.random() * 30) + 10  // 10-40 range
+                            : Math.floor(Math.random() * 30) + 60; // 60-90 range
+                        focusSlider.value = randomStart;
+
+                        // Apply initial blur based on random position
+                        const initialBlur = calculateBlurAmount(randomStart);
+                        mainImage.style.filter = `blur(${initialBlur}px)`;
+
+                        focusSliderContainer.classList.add('visible');
+
+                        backButton.classList.toggle('hidden', currentViewIndex === 0);
+                    }, 800); // Match the crossfade transition duration
+                }, 1200); // Zoom duration before crossfade starts
+            };
         }
 
         /**
-         * Handles the focus adjustment animation.
+         * Calculates the blur amount based on slider position.
+         * The optimal focus is at position 50 (center of 0-100 range).
+         * Distance from 50 increases blur, simulating over/under focusing.
          */
-        function adjustFocus() {
+        function calculateBlurAmount(sliderValue) {
+            const distance = Math.abs(sliderValue - optimalFocusValue);
+
+            // Define the "in-focus" zone (45-55)
+            if (distance <= 5) {
+                // Within optimal range - minimal to no blur
+                return distance * 0.5; // 0-2.5px blur
+            } else {
+                // Outside optimal range - progressive blur
+                // Max blur at extremes (0 or 100) should be around 20px
+                return 2.5 + (distance - 5) * 0.4; // Starts at 2.5px, increases progressively
+            }
+        }
+
+        /**
+         * Updates the image blur based on slider position.
+         */
+        function updateFocusBlur() {
+            if (!awaitingFocusAdjustment) return;
+
+            const blurAmount = calculateBlurAmount(focusSlider.value);
+            mainImage.style.filter = `blur(${blurAmount}px)`;
+
+            // Check if student found optimal focus
+            const distance = Math.abs(focusSlider.value - optimalFocusValue);
+            if (distance <= 5) {
+                // Student found the focus! After a short delay, lock it in
+                setTimeout(() => {
+                    if (!awaitingFocusAdjustment) return; // Check if still in focus mode
+
+                    const currentDistance = Math.abs(focusSlider.value - optimalFocusValue);
+                    if (currentDistance <= 5) {
+                        // Still in focus, lock it
+                        completeFocusAdjustment();
+                    }
+                }, 800); // Give them a moment to appreciate the sharp image
+            }
+        }
+
+        /**
+         * Completes the focus adjustment and enables zones.
+         */
+        function completeFocusAdjustment() {
             if (!awaitingFocusAdjustment) return;
 
             awaitingFocusAdjustment = false;
-            adjustFocusButton.classList.remove('visible');
+            focusSliderContainer.classList.remove('visible');
 
-            // Phase 4: Sharpen focus
+            // Ensure image is sharp
+            mainImage.style.filter = 'blur(0px)';
             mainImage.classList.remove('zoom-out-blurry');
-            mainImage.classList.add('focus-sharpen');
 
-            setTimeout(() => {
-                mainImage.classList.remove('focus-sharpen');
-                // Create zones for the new view
-                const currentView = currentLessonViews[currentViewIndex];
-                createZoneOverlays(currentView.zones);
-            }, 1500);
+            // Create zones for the new view
+            const currentView = currentLessonViews[currentViewIndex];
+            createZoneOverlays(currentView.zones);
         }
 
         /**
@@ -414,8 +670,9 @@
 
             // Reset any ongoing animations
             awaitingFocusAdjustment = false;
-            adjustFocusButton.classList.remove('visible');
+            focusSliderContainer.classList.remove('visible');
             mainImage.className = 'w-full h-full object-contain microscope-image';
+            mainImage.style.filter = ''; // Clear any blur
             simulationContainer.style.backgroundColor = '';
 
             instructionText.textContent = view.description;
@@ -431,21 +688,26 @@
         // --- EVENT LISTENERS ---
         // Click anywhere to advance (only when no zones are present)
         simulationContainer.addEventListener('click', (e) => {
+            console.log('simulationContainer clicked, target:', e.target);
+
             // Only advance if clicking the container directly (not zones or buttons)
             if (e.target === simulationContainer || e.target === mainImage) {
                 const currentView = currentLessonViews[currentViewIndex];
+
+                console.log('Current view zones:', currentView?.zones);
+
                 // Only allow click-to-advance if there are no zones
                 if (!currentView || !currentView.zones || currentView.zones.length === 0) {
+                    console.log('No zones present, advancing to next view');
                     renderView(currentViewIndex + 1);
+                } else {
+                    console.log('Zones present, click-to-advance disabled. Zones:', currentView.zones.length);
                 }
             }
         });
 
-        // Adjust focus button
-        adjustFocusButton.addEventListener('click', (e) => {
-            e.stopPropagation();
-            adjustFocus();
-        });
+        // Focus slider event listener
+        focusSlider.addEventListener('input', updateFocusBlur);
 
         backButton.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -459,53 +721,26 @@
             currentLessonViews = [];
             zonesOverlay.innerHTML = '';
             awaitingFocusAdjustment = false;
-            adjustFocusButton.classList.remove('visible');
+            focusSliderContainer.classList.remove('visible');
+            mainImage.style.filter = ''; // Clear blur
         });
 
         // --- INITIALIZATION ---
         window.addEventListener('load', () => {
-            // Check if we're in coordinate helper mode
-            const urlParams = new URLSearchParams(window.location.search);
-            const toolParam = urlParams.get('tool');
-
-            // Debug logging
-            console.log('URL Search String:', window.location.search);
-            console.log('Tool Parameter:', toolParam);
+            // Debug logging for tool mode
+            console.log('Server-injected TOOL_MODE:', TOOL_MODE);
             console.log('Full URL:', window.location.href);
 
-            // Check both URLSearchParams and direct string matching as fallback
-            if (toolParam === 'coordinates' || window.location.href.includes('tool=coordinates')) {
+            // Check if we're in coordinate helper mode using server-injected variable
+            if (TOOL_MODE === 'coordinates') {
                 console.log('Coordinate Helper Mode Detected - Initializing...');
                 initializeCoordinateHelper();
                 return;
             }
 
-            // Run the diagnostic test first
-            loaderContainer.innerHTML = `<div class="loader"></div><p class="mt-2 text-sm text-gray-500">Running diagnostics...</p>`;
-            google.script.run.withSuccessHandler(showDiagnosticResult).diagnoseSpreadsheetAccess();
+            // Load lessons directly
+            google.script.run.withSuccessHandler(buildLandingPage).getLessons();
         });
-
-        /**
-         * Shows the result of the diagnostic test. If it passes, it proceeds to load the lessons.
-         * If it fails, it displays the specific error message from the server.
-         */
-        function showDiagnosticResult(result) {
-            console.log("Diagnostic Result:", result);
-            if (result.startsWith("DIAGNOSTIC PASSED")) {
-                // If the test passes, we remove the diagnostic message and load the app normally
-                loaderContainer.innerHTML = `<div class="loader"></div>`;
-                google.script.run.withSuccessHandler(buildLandingPage).getLessons();
-            } else {
-                // If the test fails, we display the detailed error message and stop.
-                loaderContainer.innerHTML = `
-                    <div class="p-4 bg-red-100 dark:bg-red-900 border border-red-300 dark:border-red-700 rounded-lg text-center">
-                        <h3 class="font-bold text-red-800 dark:text-red-200">System Diagnostic Failed</h3>
-                        <p class="text-sm text-red-700 dark:text-red-300 mt-2">The application could not start due to a server-side error:</p>
-                        <p class="mt-2 p-2 bg-red-200 dark:bg-red-800 text-red-900 dark:text-red-100 text-xs rounded font-mono">${result}</p>
-                    </div>`;
-                lessonCardsContainer.style.display = 'none'; // Hide the card container
-            }
-        }
 
         // ==============================
         // COORDINATE HELPER FUNCTIONALITY
@@ -520,8 +755,133 @@
             startX: 0,
             startY: 0,
             currentZone: null,
-            initialized: false // Guard to prevent duplicate initialization
+            initialized: false, // Guard to prevent duplicate initialization
+            currentLesson: null, // Track current lesson name
+            currentImageIndex: null, // Track current image index
+            currentImageDesc: null // Track current image description
         };
+
+        /**
+         * Builds the lesson cards for the coordinate helper landing page
+         */
+        function buildCoordinateHelperLandingPage(lessons) {
+            const coordLoaderContainer = document.getElementById('coord-loader-container');
+            const coordLessonCardsContainer = document.getElementById('coord-lesson-cards-container');
+
+            coordLoaderContainer.style.display = 'none';
+            coordLessonCardsContainer.innerHTML = ''; // Clear previous cards
+
+            if (lessons.length > 0 && lessons[0].error) {
+                coordLessonCardsContainer.innerHTML = `<p class="text-red-500 col-span-full text-center">${lessons[0].error}</p>`;
+                return;
+            }
+
+            lessons.forEach(lesson => {
+                const card = document.createElement('div');
+                card.className = 'lesson-card bg-gray-50 dark:bg-gray-700 rounded-lg shadow-md overflow-hidden cursor-pointer';
+                card.innerHTML = `
+                    <img src="${lesson.previewImage || 'https://placehold.co/600x400/eeeeee/333333?text=No+Image'}" alt="${lesson.name}" class="w-full h-40 object-cover" onerror="this.src='https://placehold.co/600x400/eeeeee/333333?text=Image+Error'">
+                    <div class="p-6 text-center">
+                        <h3 class="font-bold text-lg">${lesson.name}</h3>
+                        <p class="text-gray-600 dark:text-gray-400 text-sm mt-1">${lesson.description || 'No description available.'}</p>
+                    </div>
+                `;
+                card.addEventListener('click', () => selectLessonForCoordinates(lesson.name));
+                coordLessonCardsContainer.appendChild(card);
+            });
+        }
+
+        /**
+         * Handles lesson selection in coordinate helper mode
+         */
+        function selectLessonForCoordinates(lessonName) {
+            console.log('Selecting lesson for coordinates:', lessonName);
+
+            // Hide lesson selection, show image selection with loader
+            document.getElementById('coord-lesson-selection').classList.add('hidden');
+            document.getElementById('coord-image-selection').classList.remove('hidden');
+            document.getElementById('coord-lesson-title').textContent = lessonName;
+
+            coordHelperState.currentLesson = lessonName;
+
+            // Load images for this lesson
+            google.script.run.withSuccessHandler(displayImagesForCoordinates).getLessonDataForCoordinates(lessonName);
+        }
+
+        /**
+         * Displays the image selection grid for a lesson
+         */
+        function displayImagesForCoordinates(images) {
+            const coordImagesGrid = document.getElementById('coord-images-grid');
+            coordImagesGrid.innerHTML = ''; // Clear previous images
+
+            if (images.length === 0) {
+                coordImagesGrid.innerHTML = '<p class="text-gray-500 col-span-full text-center">This lesson has no images.</p>';
+                return;
+            }
+
+            images.forEach((image, idx) => {
+                const imageCard = document.createElement('div');
+                imageCard.className = 'lesson-card bg-gray-50 dark:bg-gray-700 rounded-lg shadow-md overflow-hidden cursor-pointer';
+                imageCard.innerHTML = `
+                    <img src="${image.imageUrl}" alt="${image.description}" class="w-full h-48 object-cover" onerror="this.src='https://placehold.co/600x400/eeeeee/333333?text=Image+Error'">
+                    <div class="p-6">
+                        <h3 class="font-semibold text-md">Image ${image.index + 1}</h3>
+                        <p class="text-gray-600 dark:text-gray-400 text-sm mt-1">${image.description}</p>
+                    </div>
+                `;
+                imageCard.addEventListener('click', () => selectImageForCoordinates(image.imageUrl, image.description, image.index));
+                coordImagesGrid.appendChild(imageCard);
+            });
+        }
+
+        /**
+         * Loads the selected image into the canvas editor
+         */
+        function selectImageForCoordinates(imageUrl, description, imageIndex) {
+            console.log('Selecting image for coordinates:', imageUrl);
+
+            // Hide image selection, show canvas editor
+            document.getElementById('coord-image-selection').classList.add('hidden');
+            document.getElementById('coord-canvas-editor').classList.remove('hidden');
+
+            // Update header
+            document.getElementById('coord-canvas-title').textContent = `Zone Editor: ${coordHelperState.currentLesson}`;
+            document.getElementById('coord-canvas-subtitle').textContent = `Loading image...`;
+
+            // Update context info for JSON output
+            document.getElementById('json-lesson-name').textContent = coordHelperState.currentLesson;
+            document.getElementById('json-image-index').textContent = `Image ${imageIndex + 1}`;
+            document.getElementById('json-image-desc').textContent = description;
+
+            // Store current context
+            coordHelperState.currentImageIndex = imageIndex;
+            coordHelperState.currentImageDesc = description;
+
+            // Clear any existing zones
+            coordHelperState.zones = [];
+            updateZonesList();
+            updateJsonOutput();
+
+            // Fetch the image as base64 to bypass CORS restrictions
+            google.script.run
+                .withSuccessHandler((base64DataUrl) => {
+                    if (base64DataUrl) {
+                        // Update subtitle once loaded
+                        document.getElementById('coord-canvas-subtitle').textContent = `Image ${imageIndex + 1}: ${description}`;
+                        loadCoordinateImage(base64DataUrl);
+                    } else {
+                        alert('Failed to load image. Please try again.');
+                        document.getElementById('coord-canvas-subtitle').textContent = 'Error loading image';
+                    }
+                })
+                .withFailureHandler((error) => {
+                    console.error('Error fetching image:', error);
+                    alert('Failed to load image: ' + error.message);
+                    document.getElementById('coord-canvas-subtitle').textContent = 'Error loading image';
+                })
+                .getImageAsBase64(imageUrl);
+        }
 
         /**
          * Initializes the coordinate helper tool view
@@ -545,45 +905,59 @@
 
             console.log('Coordinate helper view should now be visible');
 
-            // Get DOM elements
-            const imageUrlInput = document.getElementById('coord-image-url');
-            const loadImageBtn = document.getElementById('load-coord-image');
-            const canvasContainer = document.getElementById('coord-canvas-container');
+            // Setup canvas context
             const canvas = document.getElementById('coord-canvas');
-            const copyJsonBtn = document.getElementById('copy-json');
-            const clearZonesBtn = document.getElementById('clear-zones');
-
             coordHelperState.canvas = canvas;
             coordHelperState.ctx = canvas.getContext('2d');
 
-            // Load image button handler
-            loadImageBtn.addEventListener('click', () => {
-                const url = imageUrlInput.value.trim();
-                if (!url) {
-                    alert('Please enter an image URL');
-                    return;
-                }
-                loadCoordinateImage(url, canvasContainer);
+            // Setup navigation button handlers
+            document.getElementById('coord-back-to-lessons').addEventListener('click', () => {
+                document.getElementById('coord-image-selection').classList.add('hidden');
+                document.getElementById('coord-lesson-selection').classList.remove('hidden');
             });
 
-            // Copy JSON button handler
-            copyJsonBtn.addEventListener('click', () => {
-                const jsonOutput = document.getElementById('json-output');
-                jsonOutput.select();
+            document.getElementById('coord-back-to-images').addEventListener('click', () => {
+                document.getElementById('coord-canvas-editor').classList.add('hidden');
+                document.getElementById('coord-image-selection').classList.remove('hidden');
+            });
+
+            document.getElementById('coord-back-to-lessons-from-canvas').addEventListener('click', () => {
+                document.getElementById('coord-canvas-editor').classList.add('hidden');
+                document.getElementById('coord-lesson-selection').classList.remove('hidden');
+            });
+
+            // Setup copy zones array button handler
+            document.getElementById('copy-zones-array').addEventListener('click', () => {
+                const zonesArrayOutput = document.getElementById('json-zones-array');
+                zonesArrayOutput.select();
                 document.execCommand('copy');
 
                 // Visual feedback
-                const originalText = copyJsonBtn.textContent;
-                copyJsonBtn.textContent = '✓ Copied!';
-                copyJsonBtn.classList.add('bg-green-700');
+                const copyBtn = document.getElementById('copy-zones-array');
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = '✓ Copied!';
                 setTimeout(() => {
-                    copyJsonBtn.textContent = originalText;
-                    copyJsonBtn.classList.remove('bg-green-700');
+                    copyBtn.textContent = originalText;
                 }, 2000);
             });
 
-            // Clear zones button handler
-            clearZonesBtn.addEventListener('click', () => {
+            // Setup copy full metadata button handler
+            document.getElementById('copy-full-metadata').addEventListener('click', () => {
+                const fullMetadataOutput = document.getElementById('json-full-metadata');
+                fullMetadataOutput.select();
+                document.execCommand('copy');
+
+                // Visual feedback
+                const copyBtn = document.getElementById('copy-full-metadata');
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = '✓ Copied!';
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                }, 2000);
+            });
+
+            // Setup clear zones button handler
+            document.getElementById('clear-zones').addEventListener('click', () => {
                 if (confirm('Are you sure you want to clear all zones?')) {
                     coordHelperState.zones = [];
                     redrawCanvas();
@@ -600,14 +974,17 @@
             // Mark as initialized
             coordHelperState.initialized = true;
             console.log('Coordinate helper initialization complete');
+
+            // Load lessons from spreadsheet
+            google.script.run.withSuccessHandler(buildCoordinateHelperLandingPage).getLessons();
         }
 
         /**
          * Loads an image into the coordinate helper canvas
+         * @param {string} dataUrl Base64-encoded data URL of the image
          */
-        function loadCoordinateImage(url, canvasContainer) {
+        function loadCoordinateImage(dataUrl) {
             const img = new Image();
-            img.crossOrigin = 'anonymous';
 
             img.onload = () => {
                 coordHelperState.image = img;
@@ -618,18 +995,15 @@
                 coordHelperState.canvas.width = Math.min(img.width, maxWidth);
                 coordHelperState.canvas.height = coordHelperState.canvas.width * aspectRatio;
 
-                // Show canvas container
-                canvasContainer.classList.remove('hidden');
-
                 // Draw image
                 redrawCanvas();
             };
 
             img.onerror = () => {
-                alert('Failed to load image. Make sure the URL is correct and accessible.');
+                alert('Failed to load image into canvas.');
             };
 
-            img.src = url;
+            img.src = dataUrl;
         }
 
         /**
@@ -693,8 +1067,12 @@
             if (!coordHelperState.image) return;
 
             const rect = coordHelperState.canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+
+            // Scale mouse coordinates to match canvas internal dimensions
+            const scaleX = coordHelperState.canvas.width / rect.width;
+            const scaleY = coordHelperState.canvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
 
             coordHelperState.isDrawing = true;
             coordHelperState.startX = x;
@@ -709,8 +1087,12 @@
             if (!coordHelperState.isDrawing || !coordHelperState.image) return;
 
             const rect = coordHelperState.canvas.getBoundingClientRect();
-            const currentX = e.clientX - rect.left;
-            const currentY = e.clientY - rect.top;
+
+            // Scale mouse coordinates to match canvas internal dimensions
+            const scaleX = coordHelperState.canvas.width / rect.width;
+            const scaleY = coordHelperState.canvas.height / rect.height;
+            const currentX = (e.clientX - rect.left) * scaleX;
+            const currentY = (e.clientY - rect.top) * scaleY;
 
             // Calculate zone in percentages
             const x = Math.min(coordHelperState.startX, currentX);
@@ -799,11 +1181,28 @@
         }
 
         /**
-         * Updates the JSON output textarea
+         * Updates the JSON output textareas
          */
         function updateJsonOutput() {
-            const jsonOutput = document.getElementById('json-output');
-            jsonOutput.value = JSON.stringify(coordHelperState.zones, null, 2);
+            const zonesArrayOutput = document.getElementById('json-zones-array');
+            const fullMetadataOutput = document.getElementById('json-full-metadata');
+
+            // Always output the zones array (this is what goes in the spreadsheet)
+            zonesArrayOutput.value = JSON.stringify(coordHelperState.zones, null, 2);
+
+            // If we have lesson context, include it in the full metadata
+            if (coordHelperState.currentLesson !== null) {
+                const outputWithMetadata = {
+                    lessonName: coordHelperState.currentLesson,
+                    imageIndex: coordHelperState.currentImageIndex,
+                    imageDescription: coordHelperState.currentImageDesc,
+                    zones: coordHelperState.zones
+                };
+                fullMetadataOutput.value = JSON.stringify(outputWithMetadata, null, 2);
+            } else {
+                // Fallback to just zones array if no context
+                fullMetadataOutput.value = JSON.stringify({ zones: coordHelperState.zones }, null, 2);
+            }
         }
     </script>
 </body>
