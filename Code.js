@@ -1,11 +1,68 @@
 /**
+ * Creates a custom menu when the spreadsheet opens.
+ * This menu provides quick access to the web app and coordinate helper tool.
+ */
+function onOpen() {
+  const ui = SpreadsheetApp.getUi();
+  ui.createMenu('🔬 Anatomy Lab')
+    .addItem('📱 Open Live Web App', 'openWebApp')
+    .addItem('📍 Open Coordinate Helper', 'openCoordinateHelper')
+    .addSeparator()
+    .addItem('ℹ️ Get Web App URL', 'showWebAppUrl')
+    .addToUi();
+}
+
+/**
+ * Opens the live web app in a new browser tab.
+ */
+function openWebApp() {
+  const url = ScriptApp.getService().getUrl();
+  const html = `<script>window.open('${url}', '_blank');google.script.host.close();</script>`;
+  SpreadsheetApp.getUi().showModalDialog(
+    HtmlService.createHtmlOutput(html).setWidth(100).setHeight(50),
+    'Opening Web App...'
+  );
+}
+
+/**
+ * Opens the web app with coordinate helper mode enabled.
+ */
+function openCoordinateHelper() {
+  const url = ScriptApp.getService().getUrl() + '?tool=coordinates';
+  const html = `<script>window.open('${url}', '_blank');google.script.host.close();</script>`;
+  SpreadsheetApp.getUi().showModalDialog(
+    HtmlService.createHtmlOutput(html).setWidth(100).setHeight(50),
+    'Opening Coordinate Helper...'
+  );
+}
+
+/**
+ * Displays the web app URL in a dialog for easy copying.
+ */
+function showWebAppUrl() {
+  const url = ScriptApp.getService().getUrl();
+  const html = `
+    <div style="font-family: Arial, sans-serif; padding: 10px;">
+      <p><strong>Web App URL:</strong></p>
+      <input type="text" value="${url}" readonly
+             style="width: 100%; padding: 8px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px;"
+             onclick="this.select()">
+      <p style="font-size: 12px; color: #666;">Click the URL to select and copy it.</p>
+    </div>
+  `;
+  SpreadsheetApp.getUi().showModalDialog(
+    HtmlService.createHtmlOutput(html).setWidth(500).setHeight(150),
+    'Web App URL'
+  );
+}
+
+/**
  * Serves the main HTML page of the web app.
  * This is the primary function that runs when the web app URL is visited.
  */
 function doGet(e) {
   return HtmlService.createHtmlOutputFromFile('Index.html')
-    .setTitle('Interactive Anatomy Lab')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    .setTitle('Interactive Anatomy Lab');
 }
 
 /**
@@ -84,30 +141,47 @@ function getLessonData(lessonName) {
     if (!sheet) {
       throw new Error("'Lesson Database' sheet not found.");
     }
-    
+
     const data = sheet.getDataRange().getValues();
     const headers = data.shift(); // Remove header row
-    
+
     // Find the row that matches the selected lessonName
     const lessonRow = data.find(row => row[0] === lessonName);
-    
+
     if (!lessonRow) {
       return []; // Return empty if lesson not found
     }
-    
+
     const views = [];
-    // Iterate through the columns by steps of 2 (Description, URL)
+    // Iterate through the columns by steps of 3 (Description, URL, Zones)
     // Starting from column B (index 1)
-    for (let i = 1; i < lessonRow.length; i += 2) {
+    for (let i = 1; i < lessonRow.length; i += 3) {
       const description = lessonRow[i];
       const imageUrl = convertGoogleDriveUrl(lessonRow[i + 1]); // Convert the URL here
-      
+      const zonesData = lessonRow[i + 2]; // Get the zones JSON string
+
       // Only add the view if both the description and URL are not blank
       if (description && imageUrl && description.toString().trim() !== "" && imageUrl.toString().trim() !== "") {
-        views.push({
+        const viewObject = {
           description: description,
-          imageUrl: imageUrl
-        });
+          imageUrl: imageUrl,
+          zones: []
+        };
+
+        // Parse zones JSON if it exists
+        if (zonesData && zonesData.toString().trim() !== "") {
+          try {
+            const parsedZones = JSON.parse(zonesData);
+            if (Array.isArray(parsedZones)) {
+              viewObject.zones = parsedZones;
+            }
+          } catch (e) {
+            Logger.log(`Warning: Could not parse zones JSON for view ${i}: ${e.toString()}`);
+            // Continue with empty zones array
+          }
+        }
+
+        views.push(viewObject);
       }
     }
     return views;

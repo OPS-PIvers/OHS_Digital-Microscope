@@ -14,16 +14,103 @@
             transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
             cursor: pointer;
         }
+        #simulation-container.has-zones {
+            cursor: default;
+        }
         .view-change-start {
             opacity: 0;
             transform: scale(0.95) rotate(-3deg);
         }
         .microscope-image {
-            transition: filter 0.8s ease-in-out;
+            transition: filter 0.8s ease-in-out, transform 1.2s ease-in-out;
         }
         .blur-in {
             filter: blur(8px);
         }
+
+        /* Microscope zoom animations */
+        .zoom-in {
+            transform: scale(1.5);
+            filter: blur(15px);
+        }
+        .zoom-out-blurry {
+            filter: blur(12px);
+            opacity: 0.7;
+        }
+        .focus-sharpen {
+            filter: blur(0px);
+            opacity: 1;
+            transition: filter 1.5s ease-out, opacity 0.8s ease-out;
+        }
+
+        /* Clickable zone styles */
+        .clickable-zone {
+            position: absolute;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            border: 2px solid transparent;
+            z-index: 10;
+        }
+        .clickable-zone:hover {
+            background-color: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.5);
+            transform: scale(1.05);
+        }
+        .zone-label {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(-8px);
+            background-color: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            z-index: 20;
+        }
+        .clickable-zone:hover .zone-label {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-12px);
+        }
+
+        /* Adjust focus button */
+        #adjust-focus-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+            padding: 16px 32px;
+            font-size: 18px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            display: none;
+        }
+        #adjust-focus-button:hover {
+            transform: translate(-50%, -50%) scale(1.05);
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+        }
+        #adjust-focus-button.visible {
+            display: block;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
         .loader {
             border: 4px solid #f3f3f3;
             border-radius: 50%;
@@ -74,6 +161,8 @@
             </div>
             <div id="simulation-container" class="relative w-full max-w-3xl mx-auto aspect-video rounded-lg overflow-hidden shadow-inner border border-gray-200 dark:border-gray-700">
                 <img id="main-image" src="" alt="Anatomy diagram" class="w-full h-full object-contain microscope-image">
+                <div id="zones-overlay"></div>
+                <button id="adjust-focus-button">🔬 Adjust Focus</button>
             </div>
             <div class="mt-4 flex justify-between items-center">
                  <button id="back-to-lessons-button" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all">
@@ -99,9 +188,12 @@
         const mainImage = document.getElementById('main-image');
         const backToLessonsButton = document.getElementById('back-to-lessons-button');
         const backButton = document.getElementById('back-button');
+        const zonesOverlay = document.getElementById('zones-overlay');
+        const adjustFocusButton = document.getElementById('adjust-focus-button');
 
         let currentLessonViews = [];
         let currentViewIndex = -1;
+        let awaitingFocusAdjustment = false;
 
         /**
          * Builds the lesson cards on the landing page.
@@ -160,44 +252,161 @@
         }
 
         /**
+         * Creates clickable zone overlays for the current view.
+         */
+        function createZoneOverlays(zones) {
+            zonesOverlay.innerHTML = ''; // Clear existing zones
+
+            if (!zones || zones.length === 0) {
+                simulationContainer.classList.remove('has-zones');
+                return;
+            }
+
+            simulationContainer.classList.add('has-zones');
+
+            zones.forEach((zone, index) => {
+                const zoneDiv = document.createElement('div');
+                zoneDiv.className = 'clickable-zone';
+                zoneDiv.style.left = `${zone.x}%`;
+                zoneDiv.style.top = `${zone.y}%`;
+                zoneDiv.style.width = `${zone.width}%`;
+                zoneDiv.style.height = `${zone.height}%`;
+
+                // Add label tooltip
+                const label = document.createElement('div');
+                label.className = 'zone-label';
+                label.textContent = zone.label || `Zone ${index + 1}`;
+                zoneDiv.appendChild(label);
+
+                // Add click handler for zone
+                zoneDiv.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    zoomToNextView();
+                });
+
+                zonesOverlay.appendChild(zoneDiv);
+            });
+        }
+
+        /**
+         * Performs the microscope zoom animation sequence.
+         */
+        function zoomToNextView() {
+            if (currentViewIndex + 1 >= currentLessonViews.length) return;
+
+            // Remove all zones during zoom
+            zonesOverlay.innerHTML = '';
+            simulationContainer.classList.remove('has-zones');
+
+            // Phase 1: Zoom in and blur current image
+            mainImage.classList.add('zoom-in');
+
+            setTimeout(() => {
+                // Phase 2: Brief dark transition
+                simulationContainer.style.backgroundColor = '#000';
+                mainImage.style.opacity = '0';
+
+                setTimeout(() => {
+                    // Phase 3: Load next image blurry
+                    currentViewIndex++;
+                    const nextView = currentLessonViews[currentViewIndex];
+                    mainImage.src = nextView.imageUrl;
+                    instructionText.textContent = nextView.description;
+
+                    mainImage.onload = () => {
+                        mainImage.classList.remove('zoom-in');
+                        mainImage.classList.add('zoom-out-blurry');
+                        mainImage.style.opacity = '1';
+                        simulationContainer.style.backgroundColor = '';
+
+                        // Show adjust focus button
+                        awaitingFocusAdjustment = true;
+                        adjustFocusButton.classList.add('visible');
+                    };
+
+                    backButton.classList.toggle('hidden', currentViewIndex === 0);
+                }, 500);
+            }, 1200);
+        }
+
+        /**
+         * Handles the focus adjustment animation.
+         */
+        function adjustFocus() {
+            if (!awaitingFocusAdjustment) return;
+
+            awaitingFocusAdjustment = false;
+            adjustFocusButton.classList.remove('visible');
+
+            // Phase 4: Sharpen focus
+            mainImage.classList.remove('zoom-out-blurry');
+            mainImage.classList.add('focus-sharpen');
+
+            setTimeout(() => {
+                mainImage.classList.remove('focus-sharpen');
+                // Create zones for the new view
+                const currentView = currentLessonViews[currentViewIndex];
+                createZoneOverlays(currentView.zones);
+            }, 1500);
+        }
+
+        /**
          * Renders a specific image and description in the simulation view.
          */
         function renderView(viewIndex) {
             if (viewIndex < 0 || viewIndex >= currentLessonViews.length) return;
 
             const view = currentLessonViews[viewIndex];
-            simulationContainer.classList.add('view-change-start');
+            currentViewIndex = viewIndex;
 
-            setTimeout(() => {
-                currentViewIndex = viewIndex;
-                instructionText.textContent = view.description;
-                mainImage.src = view.imageUrl;
-                
-                if (viewIndex > 0) mainImage.classList.add('blur-in');
-                else mainImage.classList.remove('blur-in');
-                
-                mainImage.onload = () => {
-                    simulationContainer.classList.remove('view-change-start');
-                    if (viewIndex > 0) {
-                        setTimeout(() => mainImage.classList.remove('blur-in'), 100);
-                    }
-                };
-                
+            // Reset any ongoing animations
+            awaitingFocusAdjustment = false;
+            adjustFocusButton.classList.remove('visible');
+            mainImage.className = 'w-full h-full object-contain microscope-image';
+            simulationContainer.style.backgroundColor = '';
+
+            instructionText.textContent = view.description;
+            mainImage.src = view.imageUrl;
+
+            mainImage.onload = () => {
+                // Create clickable zones if they exist
+                createZoneOverlays(view.zones);
                 backButton.classList.toggle('hidden', viewIndex === 0);
-            }, 500);
+            };
         }
 
         // --- EVENT LISTENERS ---
-        simulationContainer.addEventListener('click', () => renderView(currentViewIndex + 1));
+        // Click anywhere to advance (only when no zones are present)
+        simulationContainer.addEventListener('click', (e) => {
+            // Only advance if clicking the container directly (not zones or buttons)
+            if (e.target === simulationContainer || e.target === mainImage) {
+                const currentView = currentLessonViews[currentViewIndex];
+                // Only allow click-to-advance if there are no zones
+                if (!currentView || !currentView.zones || currentView.zones.length === 0) {
+                    renderView(currentViewIndex + 1);
+                }
+            }
+        });
+
+        // Adjust focus button
+        adjustFocusButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            adjustFocus();
+        });
+
         backButton.addEventListener('click', (e) => {
             e.stopPropagation();
             renderView(currentViewIndex - 1);
         });
+
         backToLessonsButton.addEventListener('click', () => {
             simulationView.style.display = 'none';
             landingPage.style.display = 'block';
             currentViewIndex = -1;
             currentLessonViews = [];
+            zonesOverlay.innerHTML = '';
+            awaitingFocusAdjustment = false;
+            adjustFocusButton.classList.remove('visible');
         });
 
         // --- INITIALIZATION ---
