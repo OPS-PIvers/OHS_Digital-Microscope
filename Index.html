@@ -1554,17 +1554,96 @@
                         points: state.currentPolygon,
                         label: ''
                     };
-                    state.zones.push(newZone);
-                    state.currentPolygon = [];
-                    updateZonesList();
-                    updateJsonOutput();
-                    redrawCanvas();
+
+                    // Ask for label first
+                    showCustomModal({
+                        title: 'Enter Zone Label',
+                        message: 'Please provide an optional label for this zone.',
+                        type: 'prompt',
+                        placeholder: 'e.g., Nucleus'
+                    }).then(function(label) {
+                        if (label !== null) {
+                            if (label.trim() !== '') {
+                                newZone.label = label.trim();
+                            }
+
+                            // Then ask for target image (if lessonImages available)
+                            if (state.lessonImages && state.lessonImages.length > 0) {
+                                const imageOptions = [
+                                    { value: '', label: 'None (Sequential navigation)' },
+                                    ...state.lessonImages.map(img => ({
+                                        value: img.index.toString(),
+                                        label: `Image ${img.index + 1}: ${img.description}`
+                                    }))
+                                ];
+
+                                showCustomModal({
+                                    title: 'Select Target Image',
+                                    message: 'Which image should this zone navigate to?',
+                                    type: 'select',
+                                    options: imageOptions
+                                }).then(function(targetView) {
+                                    if (targetView !== null) {
+                                        // Add targetView only if a specific image was selected
+                                        if (targetView !== '') {
+                                            newZone.targetView = parseInt(targetView);
+                                        }
+
+                                        state.zones.push(newZone);
+                                        state.currentPolygon = [];
+
+                                        // Update UI based on context
+                                        if (state === coordHelperState) {
+                                            updateZonesList();
+                                            updateJsonOutput();
+                                            redrawCanvas();
+                                        } else if (state === adminState) {
+                                            updateAdminZonesList();
+                                            redrawAdminCanvas();
+                                        }
+                                    } else {
+                                        state.currentPolygon = [];
+                                        if (state === coordHelperState) {
+                                            redrawCanvas();
+                                        } else if (state === adminState) {
+                                            redrawAdminCanvas();
+                                        }
+                                    }
+                                });
+                            } else {
+                                // No lessonImages available, just add the zone
+                                state.zones.push(newZone);
+                                state.currentPolygon = [];
+
+                                if (state === coordHelperState) {
+                                    updateZonesList();
+                                    updateJsonOutput();
+                                    redrawCanvas();
+                                } else if (state === adminState) {
+                                    updateAdminZonesList();
+                                    redrawAdminCanvas();
+                                }
+                            }
+                        } else {
+                            // User cancelled, clear polygon
+                            state.currentPolygon = [];
+                            if (state === coordHelperState) {
+                                redrawCanvas();
+                            } else if (state === adminState) {
+                                redrawAdminCanvas();
+                            }
+                        }
+                    });
                     return;
                 }
             }
 
             state.currentPolygon.push(point);
-            redrawCanvas();
+            if (state === coordHelperState) {
+                redrawCanvas();
+            } else if (state === adminState) {
+                redrawAdminCanvas();
+            }
         }
 
         function handleCanvasMouseMove(e) {
@@ -2597,21 +2676,33 @@
                 return;
             }
             zonesList.innerHTML = adminState.zones.map((zone, index) => {
+                let targetInfo = '';
+                if (zone.targetView !== undefined && zone.targetView !== null) {
+                    const targetImage = adminState.lessonImages.find(img => img.index === zone.targetView);
+                    targetInfo = targetImage
+                        ? `<br>→ Target: Image ${zone.targetView + 1} (${targetImage.description})`
+                        : `<br>→ Target: Image ${zone.targetView + 1}`;
+                }
+
                 let zoneDetails = '';
                 if (zone.type === 'poly') {
                     zoneDetails = `Polygon with ${zone.points.length} points`;
                 } else {
-                    zoneDetails = `x: ${zone.x}%, y: ${zone.y}%, w: ${zone.width}%, h: ${zone.height}%`;
+                    zoneDetails = `x: ${zone.x}%, y: ${zone.y}%<br>w: ${zone.width}%, h: ${zone.height}%`;
                 }
+
                 return `
                 <div class="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg flex justify-between items-start">
                     <div class="flex-1">
                         <div class="font-semibold text-sm">${zone.label || `Zone ${index + 1}`}</div>
                         <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                            ${zoneDetails}
+                            ${zoneDetails}${targetInfo}
                         </div>
                     </div>
                     <div class="flex gap-1 ml-2">
+                        <button onclick="editAdminZone(${index})" class="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">
+                            Edit
+                        </button>
                         <button onclick="deleteAdminZone(${index})" class="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">
                             Delete
                         </button>
@@ -2667,6 +2758,7 @@
             adminState.isDrawing = false;
 
             if (adminState.currentZone && adminState.currentZone.width > 1 && adminState.currentZone.height > 1) {
+                // First ask for label
                 showCustomModal({
                     title: 'Enter Zone Label',
                     message: 'Please provide an optional label for this zone.',
@@ -2677,11 +2769,38 @@
                         if (label.trim() !== '') {
                             adminState.currentZone.label = label.trim();
                         }
-                        adminState.zones.push(adminState.currentZone);
-                        updateAdminZonesList();
+
+                        // Then ask for target image
+                        const imageOptions = [
+                            { value: '', label: 'None (Sequential navigation)' },
+                            ...adminState.lessonImages.map(img => ({
+                                value: img.index.toString(),
+                                label: `Image ${img.index + 1}: ${img.description}`
+                            }))
+                        ];
+
+                        showCustomModal({
+                            title: 'Select Target Image',
+                            message: 'Which image should this zone navigate to?',
+                            type: 'select',
+                            options: imageOptions
+                        }).then(function(targetView) {
+                            if (targetView !== null) {
+                                // Add targetView only if a specific image was selected
+                                if (targetView !== '') {
+                                    adminState.currentZone.targetView = parseInt(targetView);
+                                }
+
+                                adminState.zones.push(adminState.currentZone);
+                                updateAdminZonesList();
+                            }
+                            adminState.currentZone = null;
+                            redrawAdminCanvas();
+                        });
+                    } else {
+                        adminState.currentZone = null;
+                        redrawAdminCanvas();
                     }
-                    adminState.currentZone = null;
-                    redrawAdminCanvas();
                 });
             } else {
                 adminState.currentZone = null;
@@ -2770,7 +2889,7 @@
                 if (newLabel !== null) {
                     const trimmedLabel = newLabel.trim();
 
-                    // Update the zone
+                    // Update the zone label
                     if (trimmedLabel !== '') {
                         adminState.zones[index].label = trimmedLabel;
                     } else {
@@ -2778,9 +2897,39 @@
                         delete adminState.zones[index].label;
                     }
 
-                    console.log('Admin zone edited:', adminState.zones[index]);
-                    updateAdminZonesList();
-                    redrawAdminCanvas();
+                    // Then ask for target image
+                    const imageOptions = [
+                        { value: '', label: 'None (Sequential navigation)' },
+                        ...adminState.lessonImages.map(img => ({
+                            value: img.index.toString(),
+                            label: `Image ${img.index + 1}: ${img.description}`
+                        }))
+                    ];
+
+                    // Set current value as default
+                    const currentTarget = zone.targetView !== undefined ? zone.targetView.toString() : '';
+
+                    showCustomModal({
+                        title: 'Select Target Image',
+                        message: 'Which image should this zone navigate to?',
+                        type: 'select',
+                        options: imageOptions,
+                        defaultValue: currentTarget
+                    }).then(function(targetView) {
+                        if (targetView !== null) {
+                            // Update targetView
+                            if (targetView !== '') {
+                                adminState.zones[index].targetView = parseInt(targetView);
+                            } else {
+                                // Remove targetView property for sequential navigation
+                                delete adminState.zones[index].targetView;
+                            }
+
+                            console.log('Admin zone edited:', adminState.zones[index]);
+                            updateAdminZonesList();
+                            redrawAdminCanvas();
+                        }
+                    });
                 }
             });
         }
