@@ -244,9 +244,70 @@
             animation: spin 0.6s linear infinite;
             margin-right: 0.5rem; /* mr-2 */
         }
+
+        /* Zone Banner Styles */
+        #zone-banner {
+            position: fixed;
+            left: 0;
+            right: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 16px 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            opacity: 0;
+            transform: translateY(-100%);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+        #zone-banner.top {
+            top: 0;
+            transform: translateY(-100%);
+        }
+        #zone-banner.bottom {
+            bottom: 0;
+            transform: translateY(100%);
+        }
+        #zone-banner.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        #zone-banner-text {
+            flex: 1;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+        #zone-banner-close {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s ease;
+            flex-shrink: 0;
+        }
+        #zone-banner-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
     </style>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 flex items-center justify-center min-h-screen p-4">
+
+    <!-- Zone Banner (Hidden by default) -->
+    <div id="zone-banner" class="bottom">
+        <div id="zone-banner-text"></div>
+        <button id="zone-banner-close" aria-label="Close banner">&times;</button>
+    </div>
 
     <div class="w-full max-w-5xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 lg:p-10">
 
@@ -924,6 +985,36 @@
         }
 
         /**
+         * Shows the zone banner with text at specified position.
+         * @param {string} text The text to display in the banner
+         * @param {string} position 'top' or 'bottom' (defaults to 'bottom')
+         */
+        function showZoneBanner(text, position = 'bottom') {
+            const banner = document.getElementById('zone-banner');
+            const bannerText = document.getElementById('zone-banner-text');
+
+            // Set text
+            bannerText.textContent = text;
+
+            // Set position
+            banner.classList.remove('top', 'bottom');
+            banner.classList.add(position);
+
+            // Show banner
+            setTimeout(() => {
+                banner.classList.add('visible');
+            }, 50);
+        }
+
+        /**
+         * Hides the zone banner.
+         */
+        function hideZoneBanner() {
+            const banner = document.getElementById('zone-banner');
+            banner.classList.remove('visible');
+        }
+
+        /**
          * Creates clickable zone overlays for the current view.
          */
         function createZoneOverlays(zones) {
@@ -997,8 +1088,13 @@
                     console.log(`Zone ${index} clicked!`);
                     e.stopPropagation();
 
+                    // Check if zone displays a banner
+                    if (zone.actionType === 'banner' && zone.bannerText) {
+                        const position = zone.bannerPosition || 'bottom';
+                        showZoneBanner(zone.bannerText, position);
+                    }
                     // Check if zone has a specific target view
-                    if (zone.targetView !== undefined && zone.targetView !== null) {
+                    else if (zone.targetView !== undefined && zone.targetView !== null) {
                         const targetIndex = parseInt(zone.targetView);
                         if (targetIndex >= 0 && targetIndex < currentLessonViews.length) {
                             navigateToView(targetIndex);
@@ -1571,6 +1667,7 @@
                             if (state.lessonImages && state.lessonImages.length > 0) {
                                 const imageOptions = [
                                     { value: '', label: 'None (Sequential navigation)' },
+                                    { value: 'banner', label: '📝 Display Text Banner' },
                                     ...state.lessonImages.map(img => ({
                                         value: img.index.toString(),
                                         label: `Image ${img.index + 1}: ${img.description}`
@@ -1578,28 +1675,96 @@
                                 ];
 
                                 showCustomModal({
-                                    title: 'Select Target Image',
-                                    message: 'Which image should this zone navigate to?',
+                                    title: 'Select Action',
+                                    message: 'What should happen when this zone is clicked?',
                                     type: 'select',
                                     options: imageOptions
                                 }).then(function(targetView) {
                                     if (targetView !== null) {
-                                        // Add targetView only if a specific image was selected
-                                        if (targetView !== '') {
-                                            newZone.targetView = parseInt(targetView);
+                                        // Check if banner option was selected
+                                        if (targetView === 'banner') {
+                                            // Ask for banner text
+                                            showCustomModal({
+                                                title: 'Banner Text',
+                                                message: 'Enter the text to display in the banner:',
+                                                type: 'prompt',
+                                                placeholder: 'e.g., This is the mitochondria, the powerhouse of the cell!'
+                                            }).then(function(bannerText) {
+                                                if (bannerText !== null && bannerText.trim() !== '') {
+                                                    // Ask for banner position
+                                                    showCustomModal({
+                                                        title: 'Banner Position',
+                                                        message: 'Where should the banner appear?',
+                                                        type: 'select',
+                                                        options: [
+                                                            { value: 'top', label: 'Top of screen' },
+                                                            { value: 'bottom', label: 'Bottom of screen' }
+                                                        ]
+                                                    }).then(function(position) {
+                                                        if (position !== null) {
+                                                            newZone.actionType = 'banner';
+                                                            newZone.bannerText = bannerText.trim();
+                                                            newZone.bannerPosition = position;
+
+                                                            state.zones.push(newZone);
+                                                            state.currentPolygon = [];
+
+                                                            if (state === coordHelperState) {
+                                                                updateZonesList();
+                                                                updateJsonOutput();
+                                                                redrawCanvas();
+                                                            } else if (state === adminState) {
+                                                                updateAdminZonesList();
+                                                                redrawAdminCanvas();
+                                                            }
+                                                        } else {
+                                                            state.currentPolygon = [];
+                                                            if (state === coordHelperState) {
+                                                                redrawCanvas();
+                                                            } else if (state === adminState) {
+                                                                redrawAdminCanvas();
+                                                            }
+                                                        }
+                                                    });
+                                                } else {
+                                                    state.currentPolygon = [];
+                                                    if (state === coordHelperState) {
+                                                        redrawCanvas();
+                                                    } else if (state === adminState) {
+                                                        redrawAdminCanvas();
+                                                    }
+                                                }
+                                            });
                                         }
+                                        // Add targetView only if a specific image was selected
+                                        else if (targetView !== '') {
+                                            newZone.targetView = parseInt(targetView);
 
-                                        state.zones.push(newZone);
-                                        state.currentPolygon = [];
+                                            state.zones.push(newZone);
+                                            state.currentPolygon = [];
 
-                                        // Update UI based on context
-                                        if (state === coordHelperState) {
-                                            updateZonesList();
-                                            updateJsonOutput();
-                                            redrawCanvas();
-                                        } else if (state === adminState) {
-                                            updateAdminZonesList();
-                                            redrawAdminCanvas();
+                                            if (state === coordHelperState) {
+                                                updateZonesList();
+                                                updateJsonOutput();
+                                                redrawCanvas();
+                                            } else if (state === adminState) {
+                                                updateAdminZonesList();
+                                                redrawAdminCanvas();
+                                            }
+                                        }
+                                        // Sequential navigation (no targetView)
+                                        else {
+                                            state.zones.push(newZone);
+                                            state.currentPolygon = [];
+
+                                            if (state === coordHelperState) {
+                                                updateZonesList();
+                                                updateJsonOutput();
+                                                redrawCanvas();
+                                            } else if (state === adminState) {
+                                                updateAdminZonesList();
+                                                redrawAdminCanvas();
+                                            }
                                         }
                                     } else {
                                         state.currentPolygon = [];
@@ -1693,6 +1858,7 @@
                         // Then ask for target image
                         const imageOptions = [
                             { value: '', label: 'None (Sequential navigation)' },
+                            { value: 'banner', label: '📝 Display Text Banner' },
                             ...coordHelperState.lessonImages.map(img => ({
                                 value: img.index.toString(),
                                 label: `Image ${img.index + 1}: ${img.description}`
@@ -1700,31 +1866,98 @@
                         ];
 
                         showCustomModal({
-                            title: 'Select Target Image',
-                            message: 'Which image should this zone navigate to?',
+                            title: 'Select Action',
+                            message: 'What should happen when this zone is clicked?',
                             type: 'select',
                             options: imageOptions
                         }).then(function(targetView) {
                             if (targetView !== null) {
-                                // Add targetView only if a specific image was selected
-                                if (targetView !== '') {
-                                    coordHelperState.currentZone.targetView = parseInt(targetView);
+                                // Check if banner option was selected
+                                if (targetView === 'banner') {
+                                    // Ask for banner text
+                                    showCustomModal({
+                                        title: 'Banner Text',
+                                        message: 'Enter the text to display in the banner:',
+                                        type: 'prompt',
+                                        placeholder: 'e.g., This is the mitochondria, the powerhouse of the cell!'
+                                    }).then(function(bannerText) {
+                                        if (bannerText !== null && bannerText.trim() !== '') {
+                                            // Ask for banner position
+                                            showCustomModal({
+                                                title: 'Banner Position',
+                                                message: 'Where should the banner appear?',
+                                                type: 'select',
+                                                options: [
+                                                    { value: 'top', label: 'Top of screen' },
+                                                    { value: 'bottom', label: 'Bottom of screen' }
+                                                ]
+                                            }).then(function(position) {
+                                                if (position !== null) {
+                                                    coordHelperState.currentZone.actionType = 'banner';
+                                                    coordHelperState.currentZone.bannerText = bannerText.trim();
+                                                    coordHelperState.currentZone.bannerPosition = position;
+
+                                                    coordHelperState.currentZone.x = Math.round(coordHelperState.currentZone.x * 100) / 100;
+                                                    coordHelperState.currentZone.y = Math.round(coordHelperState.currentZone.y * 100) / 100;
+                                                    coordHelperState.currentZone.width = Math.round(coordHelperState.currentZone.width * 100) / 100;
+                                                    coordHelperState.currentZone.height = Math.round(coordHelperState.currentZone.height * 100) / 100;
+
+                                                    console.log('Adding banner zone to array:', coordHelperState.currentZone);
+                                                    coordHelperState.zones.push(coordHelperState.currentZone);
+                                                    console.log('Total zones:', coordHelperState.zones.length);
+
+                                                    updateZonesList();
+                                                    updateJsonOutput();
+                                                }
+                                                coordHelperState.currentZone = null;
+                                                redrawCanvas();
+                                            });
+                                        } else {
+                                            coordHelperState.currentZone = null;
+                                            redrawCanvas();
+                                        }
+                                    });
                                 }
+                                // Add targetView only if a specific image was selected
+                                else if (targetView !== '') {
+                                    coordHelperState.currentZone.targetView = parseInt(targetView);
 
-                                coordHelperState.currentZone.x = Math.round(coordHelperState.currentZone.x * 100) / 100;
-                                coordHelperState.currentZone.y = Math.round(coordHelperState.currentZone.y * 100) / 100;
-                                coordHelperState.currentZone.width = Math.round(coordHelperState.currentZone.width * 100) / 100;
-                                coordHelperState.currentZone.height = Math.round(coordHelperState.currentZone.height * 100) / 100;
+                                    coordHelperState.currentZone.x = Math.round(coordHelperState.currentZone.x * 100) / 100;
+                                    coordHelperState.currentZone.y = Math.round(coordHelperState.currentZone.y * 100) / 100;
+                                    coordHelperState.currentZone.width = Math.round(coordHelperState.currentZone.width * 100) / 100;
+                                    coordHelperState.currentZone.height = Math.round(coordHelperState.currentZone.height * 100) / 100;
 
-                                console.log('Adding zone to array:', coordHelperState.currentZone);
-                                coordHelperState.zones.push(coordHelperState.currentZone);
-                                console.log('Total zones:', coordHelperState.zones.length, '| All zones:', coordHelperState.zones);
+                                    console.log('Adding zone to array:', coordHelperState.currentZone);
+                                    coordHelperState.zones.push(coordHelperState.currentZone);
+                                    console.log('Total zones:', coordHelperState.zones.length, '| All zones:', coordHelperState.zones);
 
-                                updateZonesList();
-                                updateJsonOutput();
+                                    updateZonesList();
+                                    updateJsonOutput();
+
+                                    coordHelperState.currentZone = null;
+                                    redrawCanvas();
+                                }
+                                // Sequential navigation (no targetView)
+                                else {
+                                    coordHelperState.currentZone.x = Math.round(coordHelperState.currentZone.x * 100) / 100;
+                                    coordHelperState.currentZone.y = Math.round(coordHelperState.currentZone.y * 100) / 100;
+                                    coordHelperState.currentZone.width = Math.round(coordHelperState.currentZone.width * 100) / 100;
+                                    coordHelperState.currentZone.height = Math.round(coordHelperState.currentZone.height * 100) / 100;
+
+                                    console.log('Adding zone to array:', coordHelperState.currentZone);
+                                    coordHelperState.zones.push(coordHelperState.currentZone);
+                                    console.log('Total zones:', coordHelperState.zones.length, '| All zones:', coordHelperState.zones);
+
+                                    updateZonesList();
+                                    updateJsonOutput();
+
+                                    coordHelperState.currentZone = null;
+                                    redrawCanvas();
+                                }
+                            } else {
+                                coordHelperState.currentZone = null;
+                                redrawCanvas();
                             }
-                            coordHelperState.currentZone = null;
-                            redrawCanvas();
                         });
                     } else {
                         coordHelperState.currentZone = null;
@@ -1745,7 +1978,10 @@
             }
             zonesList.innerHTML = coordHelperState.zones.map((zone, index) => {
                 let targetInfo = '';
-                if (zone.targetView !== undefined && zone.targetView !== null) {
+                if (zone.actionType === 'banner') {
+                    const preview = zone.bannerText.length > 50 ? zone.bannerText.substring(0, 50) + '...' : zone.bannerText;
+                    targetInfo = `<br>→ Banner (${zone.bannerPosition}): "${preview}"`;
+                } else if (zone.targetView !== undefined && zone.targetView !== null) {
                     const targetImage = coordHelperState.lessonImages.find(img => img.index === zone.targetView);
                     targetInfo = targetImage
                         ? `<br>→ Target: Image ${zone.targetView + 1} (${targetImage.description})`
@@ -1825,7 +2061,7 @@
                 if (zone.type === 'poly') {
                     const svgNS = "http://www.w3.org/2000/svg";
                     const svg = document.createElementNS(svgNS, "svg");
-                    svg.setAttribute('class', 'clickable-zone');
+                    svg.setAttribute('class', 'polygon-zone');
                     svg.style.width = '100%';
                     svg.style.height = '100%';
                     svg.style.position = 'absolute';
@@ -1834,18 +2070,88 @@
                     svg.style.pointerEvents = 'none';
 
                     const polygon = document.createElementNS(svgNS, "polygon");
+                    // Convert polygon points from image-relative percentages to container-relative pixels
                     const points = zone.points.map(p => {
-                        const px = (p.x / 100) * imageWidth + offsetX;
-                        const py = (p.y / 100) * imageHeight + offsetY;
-                        return `${px},${py}`;
+                        // Step 1: Convert percentage to pixels relative to image
+                        const pxInImage = (p.x / 100) * imageWidth;
+                        const pyInImage = (p.y / 100) * imageHeight;
+                        // Step 2: Add image offset within container
+                        const pxInContainer = pxInImage + offsetX;
+                        const pyInContainer = pyInImage + offsetY;
+                        return `${pxInContainer},${pyInContainer}`;
                     }).join(' ');
                     polygon.setAttribute("points", points);
-                    polygon.style.fill = 'rgba(59, 130, 246, 0.2)';
-                    polygon.style.stroke = 'rgba(59, 130, 246, 0.5)';
+                    polygon.setAttribute("class", "polygon-shape");
+                    polygon.style.fill = 'transparent';
+                    polygon.style.stroke = 'transparent';
                     polygon.style.strokeWidth = '2px';
                     polygon.style.pointerEvents = 'all';
-                    
+                    polygon.style.cursor = 'pointer';
+                    polygon.style.transition = 'fill 0.3s ease, stroke 0.3s ease';
+
+                    // Add hover effect inline since CSS :hover doesn't work well with SVG in some browsers
+                    polygon.addEventListener('mouseenter', () => {
+                        polygon.style.fill = 'rgba(59, 130, 246, 0.2)';
+                        polygon.style.stroke = 'rgba(59, 130, 246, 0.5)';
+                        // Show label
+                        const label = svg.querySelector('.zone-label');
+                        if (label) {
+                            label.style.opacity = '1';
+                            label.style.transform = 'translateX(-50%) translateY(-12px)';
+                        }
+                    });
+                    polygon.addEventListener('mouseleave', () => {
+                        polygon.style.fill = 'transparent';
+                        polygon.style.stroke = 'transparent';
+                        // Hide label
+                        const label = svg.querySelector('.zone-label');
+                        if (label) {
+                            label.style.opacity = '0';
+                            label.style.transform = 'translateX(-50%) translateY(-8px)';
+                        }
+                    });
+
+                    // Add click handler for polygon zone
+                    polygon.addEventListener('click', (e) => {
+                        console.log(`Zone ${index} clicked!`);
+                        e.stopPropagation();
+
+                        // Check if zone displays a banner
+                        if (zone.actionType === 'banner' && zone.bannerText) {
+                            const position = zone.bannerPosition || 'bottom';
+                            showZoneBanner(zone.bannerText, position);
+                        }
+                        // Check if zone has a specific target view
+                        else if (zone.targetView !== undefined && zone.targetView !== null) {
+                            const targetIndex = parseInt(zone.targetView);
+                            if (targetIndex >= 0 && targetIndex < currentLessonViews.length) {
+                                navigateToView(targetIndex);
+                            } else {
+                                console.error(`Invalid targetView ${targetIndex} for zone ${index}`);
+                                zoomToNextView(); // Fallback to sequential navigation
+                            }
+                        } else {
+                            // Default behavior: advance to next view sequentially
+                            zoomToNextView();
+                        }
+                    });
+
                     svg.appendChild(polygon);
+
+                    // Add label tooltip
+                    const label = document.createElement('div');
+                    label.className = 'zone-label';
+                    label.textContent = zone.label || `Zone ${index + 1}`;
+                    // Position label at the center of the polygon
+                    const avgX = zone.points.reduce((sum, p) => sum + p.x, 0) / zone.points.length;
+                    const avgY = zone.points.reduce((sum, p) => sum + p.y, 0) / zone.points.length;
+                    const labelX = (avgX / 100) * imageWidth + offsetX;
+                    const labelY = (avgY / 100) * imageHeight + offsetY;
+                    label.style.position = 'absolute';
+                    label.style.left = `${labelX}px`;
+                    label.style.top = `${labelY}px`;
+                    svg.appendChild(label);
+
                     zonesOverlay.appendChild(svg);
 
                 } else { // rect
@@ -1881,28 +2187,32 @@
                     label.textContent = zone.label || `Zone ${index + 1}`;
                     zoneDiv.appendChild(label);
                     zonesOverlay.appendChild(zoneDiv);
-                }
 
+                    // Add click handler for rectangular zone
+                    zoneDiv.addEventListener('click', (e) => {
+                        console.log(`Zone ${index} clicked!`);
+                        e.stopPropagation();
 
-                // Add click handler for zone
-                zonesOverlay.lastChild.addEventListener('click', (e) => {
-                    console.log(`Zone ${index} clicked!`);
-                    e.stopPropagation();
-
-                    // Check if zone has a specific target view
-                    if (zone.targetView !== undefined && zone.targetView !== null) {
-                        const targetIndex = parseInt(zone.targetView);
-                        if (targetIndex >= 0 && targetIndex < currentLessonViews.length) {
-                            navigateToView(targetIndex);
-                        } else {
-                            console.error(`Invalid targetView ${targetIndex} for zone ${index}`);
-                            zoomToNextView(); // Fallback to sequential navigation
+                        // Check if zone displays a banner
+                        if (zone.actionType === 'banner' && zone.bannerText) {
+                            const position = zone.bannerPosition || 'bottom';
+                            showZoneBanner(zone.bannerText, position);
                         }
-                    } else {
-                        // Default behavior: advance to next view sequentially
-                        zoomToNextView();
-                    }
-                });
+                        // Check if zone has a specific target view
+                        else if (zone.targetView !== undefined && zone.targetView !== null) {
+                            const targetIndex = parseInt(zone.targetView);
+                            if (targetIndex >= 0 && targetIndex < currentLessonViews.length) {
+                                navigateToView(targetIndex);
+                            } else {
+                                console.error(`Invalid targetView ${targetIndex} for zone ${index}`);
+                                zoomToNextView(); // Fallback to sequential navigation
+                            }
+                        } else {
+                            // Default behavior: advance to next view sequentially
+                            zoomToNextView();
+                        }
+                    });
+                }
 
             });
         }
@@ -1929,9 +2239,10 @@
                         delete coordHelperState.zones[index].label;
                     }
 
-                    // Then ask for target image
+                    // Then ask for action type
                     const imageOptions = [
                         { value: '', label: 'None (Sequential navigation)' },
+                        { value: 'banner', label: '📝 Display Text Banner' },
                         ...coordHelperState.lessonImages.map(img => ({
                             value: img.index.toString(),
                             label: `Image ${img.index + 1}: ${img.description}`
@@ -1939,28 +2250,89 @@
                     ];
 
                     // Set current value as default
-                    const currentTarget = zone.targetView !== undefined ? zone.targetView.toString() : '';
+                    let currentTarget = '';
+                    if (zone.actionType === 'banner') {
+                        currentTarget = 'banner';
+                    } else if (zone.targetView !== undefined) {
+                        currentTarget = zone.targetView.toString();
+                    }
 
                     showCustomModal({
-                        title: 'Select Target Image',
-                        message: 'Which image should this zone navigate to?',
+                        title: 'Select Action',
+                        message: 'What should happen when this zone is clicked?',
                         type: 'select',
                         options: imageOptions,
                         defaultValue: currentTarget
                     }).then(function(targetView) {
                         if (targetView !== null) {
-                            // Update targetView
-                            if (targetView !== '') {
-                                coordHelperState.zones[index].targetView = parseInt(targetView);
-                            } else {
-                                // Remove targetView property for sequential navigation
-                                delete coordHelperState.zones[index].targetView;
-                            }
+                            // Check if banner option was selected
+                            if (targetView === 'banner') {
+                                // Ask for banner text
+                                const currentBannerText = zone.bannerText || '';
+                                showCustomModal({
+                                    title: 'Banner Text',
+                                    message: 'Enter the text to display in the banner:',
+                                    type: 'prompt',
+                                    placeholder: 'e.g., This is the mitochondria, the powerhouse of the cell!',
+                                    defaultValue: currentBannerText
+                                }).then(function(bannerText) {
+                                    if (bannerText !== null && bannerText.trim() !== '') {
+                                        // Ask for banner position
+                                        const currentPosition = zone.bannerPosition || 'bottom';
+                                        showCustomModal({
+                                            title: 'Banner Position',
+                                            message: 'Where should the banner appear?',
+                                            type: 'select',
+                                            options: [
+                                                { value: 'top', label: 'Top of screen' },
+                                                { value: 'bottom', label: 'Bottom of screen' }
+                                            ],
+                                            defaultValue: currentPosition
+                                        }).then(function(position) {
+                                            if (position !== null) {
+                                                // Remove old properties
+                                                delete coordHelperState.zones[index].targetView;
+                                                // Set banner properties
+                                                coordHelperState.zones[index].actionType = 'banner';
+                                                coordHelperState.zones[index].bannerText = bannerText.trim();
+                                                coordHelperState.zones[index].bannerPosition = position;
 
-                            console.log('Zone edited:', coordHelperState.zones[index]);
-                            updateZonesList();
-                            updateJsonOutput();
-                            redrawCanvas();
+                                                console.log('Zone edited:', coordHelperState.zones[index]);
+                                                updateZonesList();
+                                                updateJsonOutput();
+                                                redrawCanvas();
+                                            }
+                                        });
+                                    }
+                                });
+                            }
+                            // Update targetView if a specific image was selected
+                            else if (targetView !== '') {
+                                // Remove old banner properties
+                                delete coordHelperState.zones[index].actionType;
+                                delete coordHelperState.zones[index].bannerText;
+                                delete coordHelperState.zones[index].bannerPosition;
+                                // Set target view
+                                coordHelperState.zones[index].targetView = parseInt(targetView);
+
+                                console.log('Zone edited:', coordHelperState.zones[index]);
+                                updateZonesList();
+                                updateJsonOutput();
+                                redrawCanvas();
+                            }
+                            // Sequential navigation (no targetView)
+                            else {
+                                // Remove all action properties
+                                delete coordHelperState.zones[index].targetView;
+                                delete coordHelperState.zones[index].actionType;
+                                delete coordHelperState.zones[index].bannerText;
+                                delete coordHelperState.zones[index].bannerPosition;
+
+                                console.log('Zone edited:', coordHelperState.zones[index]);
+                                updateZonesList();
+                                updateJsonOutput();
+                                redrawCanvas();
+                            }
                         }
                     });
                 }
@@ -2707,7 +3079,10 @@
             }
             zonesList.innerHTML = adminState.zones.map((zone, index) => {
                 let targetInfo = '';
-                if (zone.targetView !== undefined && zone.targetView !== null) {
+                if (zone.actionType === 'banner') {
+                    const preview = zone.bannerText.length > 50 ? zone.bannerText.substring(0, 50) + '...' : zone.bannerText;
+                    targetInfo = `<br>→ Banner (${zone.bannerPosition}): "${preview}"`;
+                } else if (zone.targetView !== undefined && zone.targetView !== null) {
                     const targetImage = adminState.lessonImages.find(img => img.index === zone.targetView);
                     targetInfo = targetImage
                         ? `<br>→ Target: Image ${zone.targetView + 1} (${targetImage.description})`
@@ -2800,9 +3175,10 @@
                             adminState.currentZone.label = label.trim();
                         }
 
-                        // Then ask for target image
+                        // Then ask for action type
                         const imageOptions = [
                             { value: '', label: 'None (Sequential navigation)' },
+                            { value: 'banner', label: '📝 Display Text Banner' },
                             ...adminState.lessonImages.map(img => ({
                                 value: img.index.toString(),
                                 label: `Image ${img.index + 1}: ${img.description}`
@@ -2810,22 +3186,71 @@
                         ];
 
                         showCustomModal({
-                            title: 'Select Target Image',
-                            message: 'Which image should this zone navigate to?',
+                            title: 'Select Action',
+                            message: 'What should happen when this zone is clicked?',
                             type: 'select',
                             options: imageOptions
                         }).then(function(targetView) {
                             if (targetView !== null) {
-                                // Add targetView only if a specific image was selected
-                                if (targetView !== '') {
-                                    adminState.currentZone.targetView = parseInt(targetView);
-                                }
+                                // Check if banner option was selected
+                                if (targetView === 'banner') {
+                                    // Ask for banner text
+                                    showCustomModal({
+                                        title: 'Banner Text',
+                                        message: 'Enter the text to display in the banner:',
+                                        type: 'prompt',
+                                        placeholder: 'e.g., This is the mitochondria, the powerhouse of the cell!'
+                                    }).then(function(bannerText) {
+                                        if (bannerText !== null && bannerText.trim() !== '') {
+                                            // Ask for banner position
+                                            showCustomModal({
+                                                title: 'Banner Position',
+                                                message: 'Where should the banner appear?',
+                                                type: 'select',
+                                                options: [
+                                                    { value: 'top', label: 'Top of screen' },
+                                                    { value: 'bottom', label: 'Bottom of screen' }
+                                                ]
+                                            }).then(function(position) {
+                                                if (position !== null) {
+                                                    adminState.currentZone.actionType = 'banner';
+                                                    adminState.currentZone.bannerText = bannerText.trim();
+                                                    adminState.currentZone.bannerPosition = position;
 
-                                adminState.zones.push(adminState.currentZone);
-                                updateAdminZonesList();
+                                                    adminState.zones.push(adminState.currentZone);
+                                                    updateAdminZonesList();
+                                                }
+                                                adminState.currentZone = null;
+                                                redrawAdminCanvas();
+                                            });
+                                        } else {
+                                            adminState.currentZone = null;
+                                            redrawAdminCanvas();
+                                        }
+                                    });
+                                }
+                                // Add targetView only if a specific image was selected
+                                else if (targetView !== '') {
+                                    adminState.currentZone.targetView = parseInt(targetView);
+
+                                    adminState.zones.push(adminState.currentZone);
+                                    updateAdminZonesList();
+
+                                    adminState.currentZone = null;
+                                    redrawAdminCanvas();
+                                }
+                                // Sequential navigation (no targetView)
+                                else {
+                                    adminState.zones.push(adminState.currentZone);
+                                    updateAdminZonesList();
+
+                                    adminState.currentZone = null;
+                                    redrawAdminCanvas();
+                                }
+                            } else {
+                                adminState.currentZone = null;
+                                redrawAdminCanvas();
                             }
-                            adminState.currentZone = null;
-                            redrawAdminCanvas();
                         });
                     } else {
                         adminState.currentZone = null;
@@ -2927,9 +3352,10 @@
                         delete adminState.zones[index].label;
                     }
 
-                    // Then ask for target image
+                    // Then ask for action type
                     const imageOptions = [
                         { value: '', label: 'None (Sequential navigation)' },
+                        { value: 'banner', label: '📝 Display Text Banner' },
                         ...adminState.lessonImages.map(img => ({
                             value: img.index.toString(),
                             label: `Image ${img.index + 1}: ${img.description}`
@@ -2937,27 +3363,86 @@
                     ];
 
                     // Set current value as default
-                    const currentTarget = zone.targetView !== undefined ? zone.targetView.toString() : '';
+                    let currentTarget = '';
+                    if (zone.actionType === 'banner') {
+                        currentTarget = 'banner';
+                    } else if (zone.targetView !== undefined) {
+                        currentTarget = zone.targetView.toString();
+                    }
 
                     showCustomModal({
-                        title: 'Select Target Image',
-                        message: 'Which image should this zone navigate to?',
+                        title: 'Select Action',
+                        message: 'What should happen when this zone is clicked?',
                         type: 'select',
                         options: imageOptions,
                         defaultValue: currentTarget
                     }).then(function(targetView) {
                         if (targetView !== null) {
-                            // Update targetView
-                            if (targetView !== '') {
-                                adminState.zones[index].targetView = parseInt(targetView);
-                            } else {
-                                // Remove targetView property for sequential navigation
-                                delete adminState.zones[index].targetView;
-                            }
+                            // Check if banner option was selected
+                            if (targetView === 'banner') {
+                                // Ask for banner text
+                                const currentBannerText = zone.bannerText || '';
+                                showCustomModal({
+                                    title: 'Banner Text',
+                                    message: 'Enter the text to display in the banner:',
+                                    type: 'prompt',
+                                    placeholder: 'e.g., This is the mitochondria, the powerhouse of the cell!',
+                                    defaultValue: currentBannerText
+                                }).then(function(bannerText) {
+                                    if (bannerText !== null && bannerText.trim() !== '') {
+                                        // Ask for banner position
+                                        const currentPosition = zone.bannerPosition || 'bottom';
+                                        showCustomModal({
+                                            title: 'Banner Position',
+                                            message: 'Where should the banner appear?',
+                                            type: 'select',
+                                            options: [
+                                                { value: 'top', label: 'Top of screen' },
+                                                { value: 'bottom', label: 'Bottom of screen' }
+                                            ],
+                                            defaultValue: currentPosition
+                                        }).then(function(position) {
+                                            if (position !== null) {
+                                                // Remove old properties
+                                                delete adminState.zones[index].targetView;
+                                                // Set banner properties
+                                                adminState.zones[index].actionType = 'banner';
+                                                adminState.zones[index].bannerText = bannerText.trim();
+                                                adminState.zones[index].bannerPosition = position;
 
-                            console.log('Admin zone edited:', adminState.zones[index]);
-                            updateAdminZonesList();
-                            redrawAdminCanvas();
+                                                console.log('Admin zone edited:', adminState.zones[index]);
+                                                updateAdminZonesList();
+                                                redrawAdminCanvas();
+                                            }
+                                        });
+                                    }
+                                });
+                            }
+                            // Update targetView if a specific image was selected
+                            else if (targetView !== '') {
+                                // Remove old banner properties
+                                delete adminState.zones[index].actionType;
+                                delete adminState.zones[index].bannerText;
+                                delete adminState.zones[index].bannerPosition;
+                                // Set target view
+                                adminState.zones[index].targetView = parseInt(targetView);
+
+                                console.log('Admin zone edited:', adminState.zones[index]);
+                                updateAdminZonesList();
+                                redrawAdminCanvas();
+                            }
+                            // Sequential navigation (no targetView)
+                            else {
+                                // Remove all action properties
+                                delete adminState.zones[index].targetView;
+                                delete adminState.zones[index].actionType;
+                                delete adminState.zones[index].bannerText;
+                                delete adminState.zones[index].bannerPosition;
+
+                                console.log('Admin zone edited:', adminState.zones[index]);
+                                updateAdminZonesList();
+                                redrawAdminCanvas();
+                            }
                         }
                     });
                 }
@@ -3204,6 +3689,9 @@
         // Event listeners for all buttons
         document.addEventListener('DOMContentLoaded', () => {
             try {
+                // Zone banner close button
+                document.getElementById('zone-banner-close')?.addEventListener('click', hideZoneBanner);
+
                 // Modal buttons
                 document.getElementById('modal-confirm-btn')?.addEventListener('click', handleModalConfirm);
                 document.getElementById('modal-cancel-btn')?.addEventListener('click', handleModalCancel);
