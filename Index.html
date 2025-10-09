@@ -644,7 +644,7 @@
          * @param {object} options - { title, message, type ('confirm'|'prompt'|'select'), placeholder, options }
          * @returns {Promise<boolean|string|null>}
          */
-        function showCustomModal({ title, message, type = 'confirm', placeholder = '', options = [] }) {
+        function showCustomModal({ title, message, type = 'confirm', placeholder = '', options = [], defaultValue = '' }) {
             return new Promise(resolve => {
                 modalResolve = resolve;
 
@@ -664,9 +664,9 @@
                     modalInput.type = 'text';
                     modalConfirmBtn.textContent = 'Submit';
                 } else if (type === 'select') {
-                    // Convert input to select element
+                    // Convert input to select element with defaultValue support
                     const selectHtml = `<select id="modal-select" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4">
-                        ${options.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('')}
+                        ${options.map(opt => `<option value="${opt.value}" ${opt.value === defaultValue ? 'selected' : ''}>${opt.label}</option>`).join('')}
                     </select>`;
                     modalInput.classList.add('hidden');
 
@@ -1921,7 +1921,7 @@
                 if (newLabel !== null) {
                     const trimmedLabel = newLabel.trim();
 
-                    // Update the zone
+                    // Update the zone label
                     if (trimmedLabel !== '') {
                         coordHelperState.zones[index].label = trimmedLabel;
                     } else {
@@ -1929,10 +1929,40 @@
                         delete coordHelperState.zones[index].label;
                     }
 
-                    console.log('Zone edited:', coordHelperState.zones[index]);
-                    updateZonesList();
-                    updateJsonOutput();
-                    redrawCanvas();
+                    // Then ask for target image
+                    const imageOptions = [
+                        { value: '', label: 'None (Sequential navigation)' },
+                        ...coordHelperState.lessonImages.map(img => ({
+                            value: img.index.toString(),
+                            label: `Image ${img.index + 1}: ${img.description}`
+                        }))
+                    ];
+
+                    // Set current value as default
+                    const currentTarget = zone.targetView !== undefined ? zone.targetView.toString() : '';
+
+                    showCustomModal({
+                        title: 'Select Target Image',
+                        message: 'Which image should this zone navigate to?',
+                        type: 'select',
+                        options: imageOptions,
+                        defaultValue: currentTarget
+                    }).then(function(targetView) {
+                        if (targetView !== null) {
+                            // Update targetView
+                            if (targetView !== '') {
+                                coordHelperState.zones[index].targetView = parseInt(targetView);
+                            } else {
+                                // Remove targetView property for sequential navigation
+                                delete coordHelperState.zones[index].targetView;
+                            }
+
+                            console.log('Zone edited:', coordHelperState.zones[index]);
+                            updateZonesList();
+                            updateJsonOutput();
+                            redrawCanvas();
+                        }
+                    });
                 }
             });
         }
@@ -2994,6 +3024,9 @@
             google.script.run
                 .withSuccessHandler((result) => {
                     if (result.success) {
+                        // Store lesson images for target selection in zone dropdowns
+                        adminState.lessonImages = result.data.images;
+
                         const image = result.data.images[imageIndex];
                         adminState.currentImage = image;
                         adminState.currentImageIndex = imageIndex;
