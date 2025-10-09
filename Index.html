@@ -98,6 +98,21 @@
             transform: translateX(-50%) translateY(-12px);
         }
 
+        /* Drawing mode buttons */
+        .draw-mode-btn.active {
+            background-color: #3b82f6; /* bg-blue-600 */
+            color: white;
+            cursor: default;
+        }
+        .draw-mode-btn:not(.active) {
+            background-color: #e5e7eb; /* bg-gray-200 */
+            color: #4b5563; /* text-gray-600 */
+        }
+        .dark .draw-mode-btn:not(.active) {
+            background-color: #4b5563; /* dark:bg-gray-600 */
+            color: #d1d5db; /* dark:text-gray-300 */
+        }
+
         /* Focus slider */
         #focus-slider-container {
             display: none;
@@ -297,10 +312,16 @@
 
                 <div class="mb-4">
                     <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                        <strong>Instructions:</strong> Click and drag on the image to create rectangular zones. Each zone will be assigned coordinates as percentages.
+                        <strong>Instructions:</strong><br>
+                        - <strong>Rectangle Mode:</strong> Click and drag to create a rectangle.<br>
+                        - <strong>Polygon Mode:</strong> Click to place points. Click the first point to close the shape.
                     </p>
                 </div>
 
+                <div class="flex items-center justify-center gap-2 mb-4">
+                    <button id="draw-mode-rect" class="px-4 py-2 text-sm font-semibold rounded-lg transition-all">Rectangle</button>
+                    <button id="draw-mode-poly" class="px-4 py-2 text-sm font-semibold rounded-lg transition-all">Polygon</button>
+                </div>
                 <div class="relative w-full max-w-3xl mx-auto bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden border-2 border-gray-300 dark:border-gray-600" id="canvas-wrapper">
                     <div id="canvas-loader" class="absolute inset-0 bg-gray-200/50 dark:bg-gray-800/50 flex items-center justify-center hidden z-10"><div class="loader"></div></div>
                     <canvas id="coord-canvas" class="w-full cursor-crosshair"></canvas>
@@ -513,8 +534,15 @@
 
                 <div class="mb-4">
                     <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                        <strong>Instructions:</strong> Click and drag on the image to create rectangular zones.
+                        <strong>Instructions:</strong><br>
+                        - <strong>Rectangle Mode:</strong> Click and drag to create a rectangle.<br>
+                        - <strong>Polygon Mode:</strong> Click to place points. Click the first point to close the shape.
                     </p>
+                </div>
+
+                <div class="flex items-center justify-center gap-2 mb-4">
+                    <button id="admin-draw-mode-rect" class="px-4 py-2 text-sm font-semibold rounded-lg transition-all">Rectangle</button>
+                    <button id="admin-draw-mode-poly" class="px-4 py-2 text-sm font-semibold rounded-lg transition-all">Polygon</button>
                 </div>
 
                 <div class="relative w-full max-w-3xl mx-auto bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden border-2 border-gray-300 dark:border-gray-600" id="admin-canvas-wrapper">
@@ -1277,7 +1305,9 @@
             canvas: null, ctx: null, image: null, zones: [], isDrawing: false,
             startX: 0, startY: 0, currentZone: null, initialized: false,
             currentLesson: null, currentImageIndex: null, currentImageDesc: null,
-            lessonImages: [] // Store all images in the lesson for target selection
+            lessonImages: [], // Store all images in the lesson for target selection
+            drawMode: 'rect', // 'rect' or 'poly'
+            currentPolygon: [], // Array of points for the polygon being drawn
         };
 
         function buildCoordinateHelperLandingPage(lessons) {
@@ -1409,6 +1439,28 @@
             canvas.addEventListener('mousedown', handleCanvasMouseDown);
             canvas.addEventListener('mousemove', handleCanvasMouseMove);
             canvas.addEventListener('mouseup', handleCanvasMouseUp);
+
+            // Drawing mode buttons
+            const rectBtn = document.getElementById('draw-mode-rect');
+            const polyBtn = document.getElementById('draw-mode-poly');
+
+            rectBtn.classList.add('draw-mode-btn', 'active');
+            polyBtn.classList.add('draw-mode-btn');
+
+            rectBtn.addEventListener('click', () => {
+                coordHelperState.drawMode = 'rect';
+                rectBtn.classList.add('active');
+                polyBtn.classList.remove('active');
+                coordHelperState.currentPolygon = []; // Clear any partial polygon
+                redrawCanvas();
+            });
+
+            polyBtn.addEventListener('click', () => {
+                coordHelperState.drawMode = 'poly';
+                polyBtn.classList.add('active');
+                rectBtn.classList.remove('active');
+            });
+
             coordHelperState.initialized = true;
 
             google.script.run
@@ -1460,6 +1512,12 @@
 
         function handleCanvasMouseDown(e) {
             if (!coordHelperState.image) return;
+
+            if (coordHelperState.drawMode === 'poly') {
+                handlePolygonClick(e, coordHelperState);
+                return;
+            }
+
             const rect = coordHelperState.canvas.getBoundingClientRect();
             const scaleX = coordHelperState.canvas.width / rect.width;
             const scaleY = coordHelperState.canvas.height / rect.height;
@@ -1471,8 +1529,46 @@
             coordHelperState.currentZone = null;
         }
 
+
+        function handlePolygonClick(e, state) {
+            const rect = state.canvas.getBoundingClientRect();
+            const scaleX = state.canvas.width / rect.width;
+            const scaleY = state.canvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+
+            const point = {
+                x: (x / state.canvas.width) * 100,
+                y: (y / state.canvas.height) * 100
+            };
+
+            if (state.currentPolygon.length > 0) {
+                const firstPoint = state.currentPolygon[0];
+                const firstPointCanvasX = (firstPoint.x / 100) * state.canvas.width;
+                const firstPointCanvasY = (firstPoint.y / 100) * state.canvas.height;
+                const distance = Math.sqrt(Math.pow(x - firstPointCanvasX, 2) + Math.pow(y - firstPointCanvasY, 2));
+
+                if (distance < 10) { // Close polygon
+                    const newZone = {
+                        type: 'poly',
+                        points: state.currentPolygon,
+                        label: ''
+                    };
+                    state.zones.push(newZone);
+                    state.currentPolygon = [];
+                    updateZonesList();
+                    updateJsonOutput();
+                    redrawCanvas();
+                    return;
+                }
+            }
+
+            state.currentPolygon.push(point);
+            redrawCanvas();
+        }
+
         function handleCanvasMouseMove(e) {
-            if (!coordHelperState.isDrawing || !coordHelperState.image) return;
+            if (coordHelperState.drawMode === 'poly' || !coordHelperState.isDrawing || !coordHelperState.image) return;
             const rect = coordHelperState.canvas.getBoundingClientRect();
             const scaleX = coordHelperState.canvas.width / rect.width;
             const scaleY = coordHelperState.canvas.height / rect.height;
@@ -1483,6 +1579,7 @@
             const width = Math.abs(currentX - coordHelperState.startX);
             const height = Math.abs(currentY - coordHelperState.startY);
             coordHelperState.currentZone = {
+                type: 'rect',
                 x: (x / coordHelperState.canvas.width) * 100,
                 y: (y / coordHelperState.canvas.height) * 100,
                 width: (width / coordHelperState.canvas.width) * 100,
@@ -1493,7 +1590,7 @@
         }
 
         function handleCanvasMouseUp(e) {
-            if (!coordHelperState.isDrawing || !coordHelperState.image) return;
+            if (coordHelperState.drawMode === 'poly' || !coordHelperState.isDrawing || !coordHelperState.image) return;
             coordHelperState.isDrawing = false;
 
             if (coordHelperState.currentZone && coordHelperState.currentZone.width > 1 && coordHelperState.currentZone.height > 1) {
@@ -1575,13 +1672,20 @@
                         ? `<br>→ Target: Image ${zone.targetView + 1} (${targetImage.description})`
                         : `<br>→ Target: Image ${zone.targetView + 1}`;
                 }
+
+                let zoneDetails = '';
+                if (zone.type === 'poly') {
+                    zoneDetails = `Polygon with ${zone.points.length} points`;
+                } else {
+                    zoneDetails = `x: ${zone.x}%, y: ${zone.y}%<br>w: ${zone.width}%, h: ${zone.height}%`;
+                }
+
                 return `
                 <div class="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg flex justify-between items-start">
                     <div class="flex-1">
                         <div class="font-semibold text-sm">${zone.label || `Zone ${index + 1}`}</div>
                         <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                            x: ${zone.x}%, y: ${zone.y}%<br>
-                            w: ${zone.width}%, h: ${zone.height}%${targetInfo}
+                            ${zoneDetails}${targetInfo}
                         </div>
                     </div>
                     <div class="flex gap-1 ml-2">
@@ -1595,6 +1699,133 @@
                 </div>
                 `;
             }).join('');
+        }
+        
+        document.getElementById('clear-zones').addEventListener('click', () => {
+            coordHelperState.zones = [];
+            coordHelperState.currentPolygon = [];
+            updateZonesList();
+            updateJsonOutput();
+            redrawCanvas();
+        });
+        
+        function createZoneOverlays(zones) {
+            zonesOverlay.innerHTML = ''; // Clear existing zones
+
+            console.log('createZoneOverlays called with zones:', zones);
+
+            if (!zones || zones.length === 0) {
+                console.log('No zones to create');
+                simulationContainer.classList.remove('has-zones');
+                return;
+            }
+
+            simulationContainer.classList.add('has-zones');
+            console.log(`Creating ${zones.length} zone overlays`);
+
+            // Get the actual dimensions of the container and the image
+            const containerRect = simulationContainer.getBoundingClientRect();
+            const imageRect = mainImage.getBoundingClientRect();
+
+            // Calculate the offset and scale of the image within the container
+            // (due to object-contain, the image might be smaller and centered)
+            const offsetX = imageRect.left - containerRect.left;
+            const offsetY = imageRect.top - containerRect.top;
+            const imageWidth = imageRect.width;
+            const imageHeight = imageRect.height;
+            const containerWidth = containerRect.width;
+            const containerHeight = containerRect.height;
+
+            console.log('Container dimensions:', containerWidth, 'x', containerHeight);
+            console.log('Image dimensions:', imageWidth, 'x', imageHeight);
+            console.log('Image offset:', offsetX, ',', offsetY);
+
+            zones.forEach((zone, index) => {
+                console.log(`Zone ${index}:`, zone);
+
+                if (zone.type === 'poly') {
+                    const svgNS = "http://www.w3.org/2000/svg";
+                    const svg = document.createElementNS(svgNS, "svg");
+                    svg.setAttribute('class', 'clickable-zone');
+                    svg.style.width = '100%';
+                    svg.style.height = '100%';
+                    svg.style.position = 'absolute';
+                    svg.style.left = '0';
+                    svg.style.top = '0';
+                    svg.style.pointerEvents = 'none';
+
+                    const polygon = document.createElementNS(svgNS, "polygon");
+                    const points = zone.points.map(p => {
+                        const px = (p.x / 100) * imageWidth + offsetX;
+                        const py = (p.y / 100) * imageHeight + offsetY;
+                        return `${px},${py}`;
+                    }).join(' ');
+                    polygon.setAttribute("points", points);
+                    polygon.style.fill = 'rgba(59, 130, 246, 0.2)';
+                    polygon.style.stroke = 'rgba(59, 130, 246, 0.5)';
+                    polygon.style.strokeWidth = '2px';
+                    polygon.style.pointerEvents = 'all';
+                    
+                    svg.appendChild(polygon);
+                    zonesOverlay.appendChild(svg);
+
+                } else { // rect
+                    const zoneDiv = document.createElement('div');
+                    zoneDiv.className = 'clickable-zone';
+
+                    // Calculate zone position relative to the actual image, not the container
+                    // Zone percentages are relative to the image, so we need to:
+                    // 1. Convert percentages to pixels relative to the image
+                    // 2. Add the image offset within the container
+                    // 3. Convert back to percentages relative to the container
+                    const zoneLeftPx = (zone.x / 100) * imageWidth + offsetX;
+                    const zoneTopPx = (zone.y / 100) * imageHeight + offsetY;
+                    const zoneWidthPx = (zone.width / 100) * imageWidth;
+                    const zoneHeightPx = (zone.height / 100) * imageHeight;
+
+                    // Convert to percentages of the container
+                    const zoneLeftPercent = (zoneLeftPx / containerWidth) * 100;
+                    const zoneTopPercent = (zoneTopPx / containerHeight) * 100;
+                    const zoneWidthPercent = (zoneWidthPx / containerWidth) * 100;
+                    const zoneHeightPercent = (zoneHeightPx / containerHeight) * 100;
+
+                    zoneDiv.style.left = `${zoneLeftPercent}%`;
+                    zoneDiv.style.top = `${zoneTopPercent}%`;
+                    zoneDiv.style.width = `${zoneWidthPercent}%`;
+                    zoneDiv.style.height = `${zoneHeightPercent}%`;
+
+                    console.log(`Zone ${index} positioned at: left=${zoneLeftPercent.toFixed(2)}%, top=${zoneTopPercent.toFixed(2)}%, width=${zoneWidthPercent.toFixed(2)}%, height=${zoneHeightPercent.toFixed(2)}%`);
+
+                    // Add label tooltip
+                    const label = document.createElement('div');
+                    label.className = 'zone-label';
+                    label.textContent = zone.label || `Zone ${index + 1}`;
+                    zoneDiv.appendChild(label);
+                    zonesOverlay.appendChild(zoneDiv);
+                }
+
+
+                // Add click handler for zone
+                zonesOverlay.lastChild.addEventListener('click', (e) => {
+                    console.log(`Zone ${index} clicked!`);
+                    e.stopPropagation();
+
+                    // Check if zone has a specific target view
+                    if (zone.targetView !== undefined && zone.targetView !== null) {
+                        const targetIndex = parseInt(zone.targetView);
+                        if (targetIndex >= 0 && targetIndex < currentLessonViews.length) {
+                            navigateToView(targetIndex);
+                        } else {
+                            console.error(`Invalid targetView ${targetIndex} for zone ${index}`);
+                            zoomToNextView(); // Fallback to sequential navigation
+                        }
+                    } else {
+                        // Default behavior: advance to next view sequentially
+                        zoomToNextView();
+                    }
+                });
+
+            });
         }
 
         function editZone(index) {
@@ -1671,7 +1902,9 @@
             startY: 0,
             currentZone: null,
             folderId: null,
-            lessonImages: [] // Store all images in the lesson for target selection
+            lessonImages: [], // Store all images in the lesson for target selection
+            drawMode: 'rect', // 'rect' or 'poly'
+            currentPolygon: [], // Array of points for the polygon being drawn
         };
 
         /**
@@ -2259,6 +2492,29 @@
             adminState.canvas.addEventListener('mousemove', handleAdminCanvasMouseMove);
             adminState.canvas.addEventListener('mouseup', handleAdminCanvasMouseUp);
 
+            // Drawing mode buttons
+            const rectBtn = document.getElementById('admin-draw-mode-rect');
+            const polyBtn = document.getElementById('admin-draw-mode-poly');
+
+            rectBtn.classList.add('draw-mode-btn', 'active');
+            polyBtn.classList.add('draw-mode-btn');
+            polyBtn.classList.remove('active');
+            adminState.drawMode = 'rect'; // Default to rect
+
+            rectBtn.addEventListener('click', () => {
+                adminState.drawMode = 'rect';
+                rectBtn.classList.add('active');
+                polyBtn.classList.remove('active');
+                adminState.currentPolygon = []; // Clear any partial polygon
+                redrawAdminCanvas();
+            });
+
+            polyBtn.addEventListener('click', () => {
+                adminState.drawMode = 'poly';
+                polyBtn.classList.add('active');
+                rectBtn.classList.remove('active');
+            });
+
             // Load the image
             loadAdminImage(adminState.currentImageData);
             updateAdminZonesList();
@@ -2329,155 +2585,33 @@
         /**
          * Admin canvas mouse down handler
          */
-        function handleAdminCanvasMouseDown(e) {
-            if (!adminState.image) return;
 
-            const rect = adminState.canvas.getBoundingClientRect();
-            const scaleX = adminState.canvas.width / rect.width;
-            const scaleY = adminState.canvas.height / rect.height;
-            const x = (e.clientX - rect.left) * scaleX;
-            const y = (e.clientY - rect.top) * scaleY;
-
-            adminState.isDrawing = true;
-            adminState.startX = x;
-            adminState.startY = y;
-            adminState.currentZone = null;
-        }
-
-        /**
-         * Admin canvas mouse move handler
-         */
-        function handleAdminCanvasMouseMove(e) {
-            if (!adminState.isDrawing || !adminState.image) return;
-
-            const rect = adminState.canvas.getBoundingClientRect();
-            const scaleX = adminState.canvas.width / rect.width;
-            const scaleY = adminState.canvas.height / rect.height;
-            const currentX = (e.clientX - rect.left) * scaleX;
-            const currentY = (e.clientY - rect.top) * scaleY;
-
-            const x = Math.min(adminState.startX, currentX);
-            const y = Math.min(adminState.startY, currentY);
-            const width = Math.abs(currentX - adminState.startX);
-            const height = Math.abs(currentY - adminState.startY);
-
-            adminState.currentZone = {
-                x: (x / adminState.canvas.width) * 100,
-                y: (y / adminState.canvas.height) * 100,
-                width: (width / adminState.canvas.width) * 100,
-                height: (height / adminState.canvas.height) * 100,
-                label: ''
-            };
-
-            redrawAdminCanvas();
-        }
-
-        /**
-         * Admin canvas mouse up handler
-         */
-        function handleAdminCanvasMouseUp(e) {
-            if (!adminState.isDrawing || !adminState.image) return;
-
-            adminState.isDrawing = false;
-
-            if (adminState.currentZone &&
-                adminState.currentZone.width > 1 &&
-                adminState.currentZone.height > 1) {
-
-                // First ask for label
-                showCustomModal({
-                    title: 'Enter Zone Label',
-                    message: 'Enter a label for this zone (optional):',
-                    type: 'prompt'
-                }).then(function(label) {
-                    if (label !== null) {
-                        // Trim and validate label
-                        const trimmedLabel = label.trim();
-                        console.log('Admin zone label entered:', label, '| Trimmed:', trimmedLabel);
-
-                        // Only set label if non-empty, otherwise leave undefined for default fallback
-                        if (trimmedLabel !== '') {
-                            adminState.currentZone.label = trimmedLabel;
-                        }
-
-                        // Then ask for target image
-                        const imageOptions = [
-                            { value: '', label: 'None (Sequential navigation)' },
-                            ...adminState.lessonImages.map(img => ({
-                                value: img.index.toString(),
-                                label: `Image ${img.index + 1}: ${img.description}`
-                            }))
-                        ];
-
-                        showCustomModal({
-                            title: 'Select Target Image',
-                            message: 'Which image should this zone navigate to?',
-                            type: 'select',
-                            options: imageOptions
-                        }).then(function(targetView) {
-                            if (targetView !== null) {
-                                // Add targetView only if a specific image was selected
-                                if (targetView !== '') {
-                                    adminState.currentZone.targetView = parseInt(targetView);
-                                }
-
-                                adminState.currentZone.x = Math.round(adminState.currentZone.x * 100) / 100;
-                                adminState.currentZone.y = Math.round(adminState.currentZone.y * 100) / 100;
-                                adminState.currentZone.width = Math.round(adminState.currentZone.width * 100) / 100;
-                                adminState.currentZone.height = Math.round(adminState.currentZone.height * 100) / 100;
-
-                                console.log('Adding admin zone to array:', adminState.currentZone);
-                                adminState.zones.push(adminState.currentZone);
-                                console.log('Total admin zones:', adminState.zones.length, '| All zones:', adminState.zones);
-
-                                updateAdminZonesList();
-                            }
-                            adminState.currentZone = null;
-                            redrawAdminCanvas();
-                        });
-                    } else {
-                        adminState.currentZone = null;
-                        redrawAdminCanvas();
-                    }
-                });
-            } else {
-                adminState.currentZone = null;
-                redrawAdminCanvas();
-            }
-        }
 
         /**
          * Updates the admin zones list
          */
         function updateAdminZonesList() {
             const zonesList = document.getElementById('admin-zones-list');
-
             if (adminState.zones.length === 0) {
                 zonesList.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">No zones defined yet.</p>';
                 return;
             }
-
             zonesList.innerHTML = adminState.zones.map((zone, index) => {
-                let targetInfo = '';
-                if (zone.targetView !== undefined && zone.targetView !== null) {
-                    const targetImage = adminState.lessonImages.find(img => img.index === zone.targetView);
-                    targetInfo = targetImage
-                        ? `<br>→ Target: Image ${zone.targetView + 1} (${targetImage.description})`
-                        : `<br>→ Target: Image ${zone.targetView + 1}`;
+                let zoneDetails = '';
+                if (zone.type === 'poly') {
+                    zoneDetails = `Polygon with ${zone.points.length} points`;
+                } else {
+                    zoneDetails = `x: ${zone.x}%, y: ${zone.y}%, w: ${zone.width}%, h: ${zone.height}%`;
                 }
                 return `
                 <div class="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg flex justify-between items-start">
                     <div class="flex-1">
                         <div class="font-semibold text-sm">${zone.label || `Zone ${index + 1}`}</div>
                         <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                            x: ${zone.x}%, y: ${zone.y}%<br>
-                            w: ${zone.width}%, h: ${zone.height}%${targetInfo}
+                            ${zoneDetails}
                         </div>
                     </div>
                     <div class="flex gap-1 ml-2">
-                        <button onclick="editAdminZone(${index})" class="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">
-                            Edit
-                        </button>
                         <button onclick="deleteAdminZone(${index})" class="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">
                             Delete
                         </button>
@@ -2485,6 +2619,138 @@
                 </div>
                 `;
             }).join('');
+        }
+
+        function handleAdminCanvasMouseDown(e) {
+            if (!adminState.image) return;
+
+            if (adminState.drawMode === 'poly') {
+                handlePolygonClick(e, adminState);
+                return;
+            }
+
+            const rect = adminState.canvas.getBoundingClientRect();
+            const scaleX = adminState.canvas.width / rect.width;
+            const scaleY = adminState.canvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+            adminState.isDrawing = true;
+            adminState.startX = x;
+            adminState.startY = y;
+            adminState.currentZone = null;
+        }
+
+        function handleAdminCanvasMouseMove(e) {
+            if (adminState.drawMode === 'poly' || !adminState.isDrawing || !adminState.image) return;
+            const rect = adminState.canvas.getBoundingClientRect();
+            const scaleX = adminState.canvas.width / rect.width;
+            const scaleY = adminState.canvas.height / rect.height;
+            const currentX = (e.clientX - rect.left) * scaleX;
+            const currentY = (e.clientY - rect.top) * scaleY;
+            const x = Math.min(adminState.startX, currentX);
+            const y = Math.min(adminState.startY, currentY);
+            const width = Math.abs(currentX - adminState.startX);
+            const height = Math.abs(currentY - adminState.startY);
+            adminState.currentZone = {
+                type: 'rect',
+                x: (x / adminState.canvas.width) * 100,
+                y: (y / adminState.canvas.height) * 100,
+                width: (width / adminState.canvas.width) * 100,
+                height: (height / adminState.canvas.height) * 100,
+                label: ''
+            };
+            redrawAdminCanvas();
+        }
+
+        function handleAdminCanvasMouseUp(e) {
+            if (adminState.drawMode === 'poly' || !adminState.isDrawing || !adminState.image) return;
+            adminState.isDrawing = false;
+
+            if (adminState.currentZone && adminState.currentZone.width > 1 && adminState.currentZone.height > 1) {
+                showCustomModal({
+                    title: 'Enter Zone Label',
+                    message: 'Please provide an optional label for this zone.',
+                    type: 'prompt',
+                    placeholder: 'e.g., Nucleus'
+                }).then(function(label) {
+                    if (label !== null) {
+                        if (label.trim() !== '') {
+                            adminState.currentZone.label = label.trim();
+                        }
+                        adminState.zones.push(adminState.currentZone);
+                        updateAdminZonesList();
+                    }
+                    adminState.currentZone = null;
+                    redrawAdminCanvas();
+                });
+            } else {
+                adminState.currentZone = null;
+                redrawAdminCanvas();
+            }
+        }
+
+        function redrawAdminCanvas() {
+            if (!adminState.image) return;
+            const { ctx, canvas, image, zones, currentZone, currentPolygon } = adminState;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+            zones.forEach((zone, index) => drawAdminZone(zone, index, false));
+            if (currentZone) drawAdminZone(currentZone, zones.length, true);
+
+            if (currentPolygon.length > 0) {
+                ctx.strokeStyle = '#fbbf24';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                currentPolygon.forEach((p, i) => {
+                    const x = (p.x / 100) * canvas.width;
+                    const y = (p.y / 100) * canvas.height;
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                });
+                ctx.stroke();
+            }
+        }
+
+        function drawAdminZone(zone, index, isTemporary) {
+            const { ctx, canvas } = adminState;
+            ctx.strokeStyle = isTemporary ? '#fbbf24' : '#3b82f6';
+            ctx.lineWidth = 2;
+
+            if (zone.type === 'poly') {
+                ctx.beginPath();
+                zone.points.forEach((p, i) => {
+                    const x = (p.x / 100) * canvas.width;
+                    const y = (p.y / 100) * canvas.height;
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                });
+                ctx.closePath();
+                ctx.stroke();
+                ctx.fillStyle = isTemporary ? 'rgba(251, 191, 36, 0.2)' : 'rgba(59, 130, 246, 0.2)';
+                ctx.fill();
+            } else { // rect
+                const x = (zone.x / 100) * canvas.width;
+                const y = (zone.y / 100) * canvas.height;
+                const width = (zone.width / 100) * canvas.width;
+                const height = (zone.height / 100) * canvas.height;
+                ctx.strokeRect(x, y, width, height);
+                ctx.fillStyle = isTemporary ? 'rgba(251, 191, 36, 0.2)' : 'rgba(59, 130, 246, 0.2)';
+                ctx.fillRect(x, y, width, height);
+            }
+
+            if (zone.label) {
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 14px Inter, sans-serif';
+                const x = (zone.type === 'poly' ? zone.points[0].x : zone.x) / 100 * canvas.width;
+                const y = (zone.type === 'poly' ? zone.points[0].y : zone.y) / 100 * canvas.height;
+                ctx.fillText(zone.label, x + 5, y + 20);
+            }
         }
 
         /**
@@ -2529,8 +2795,14 @@
             updateAdminZonesList();
             redrawAdminCanvas();
         }
-        // Expose to global scope for inline onclick handlers
         window.deleteAdminZone = deleteAdminZone;
+
+        document.getElementById('admin-clear-zones').addEventListener('click', () => {
+            adminState.zones = [];
+            adminState.currentPolygon = [];
+            updateAdminZonesList();
+            redrawAdminCanvas();
+        });
 
         /**
          * Saves zones and returns to image manager
@@ -2744,6 +3016,8 @@
         window.editImageDescription = editImageDescription;
         window.replaceImageFile = replaceImageFile;
         window.deleteImageFile = deleteImageFile;
+
+
 
         // Event listeners for all buttons
         document.addEventListener('DOMContentLoaded', () => {
