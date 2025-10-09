@@ -655,3 +655,330 @@ function getLessonForEditing(lessonName) {
     };
   }
 }
+
+/**
+ * Extracts file ID from a Google Drive URL.
+ * @param {string} url The Google Drive URL.
+ * @returns {string|null} The file ID or null if not found.
+ */
+function extractFileIdFromUrl(url) {
+  if (!url || typeof url !== 'string') {
+    return null;
+  }
+  const fileIdMatch = url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|thumbnail\?id=)([a-zA-Z0-9_-]+)/);
+  return fileIdMatch ? fileIdMatch[1] : null;
+}
+
+/**
+ * Gets the folder ID for a lesson.
+ * @param {string} lessonTitle The title of the lesson.
+ * @returns {Object} Object with success boolean, folderId, and message.
+ */
+function getLessonFolderId(lessonTitle) {
+  try {
+    const ROOT_FOLDER_ID = '1L69YbBWOi7AM_LrB5A1ENTy-AJHoTTRf';
+    const rootFolder = DriveApp.getFolderById(ROOT_FOLDER_ID);
+
+    const existingFolders = rootFolder.getFoldersByName(lessonTitle);
+    if (existingFolders.hasNext()) {
+      const folder = existingFolders.next();
+      return {
+        success: true,
+        folderId: folder.getId(),
+        message: "Folder found."
+      };
+    }
+
+    return {
+      success: false,
+      message: "Folder not found for this lesson."
+    };
+  } catch (error) {
+    Logger.log(`Get lesson folder error: ${error.toString()}`);
+    return {
+      success: false,
+      message: `Failed to get folder: ${error.toString()}`
+    };
+  }
+}
+
+/**
+ * Edits an image's title and description in the spreadsheet.
+ * @param {string} lessonName The name of the lesson.
+ * @param {number} imageIndex The index of the image (0-based).
+ * @param {string} newDescription The new description for the image.
+ * @returns {Object} Object with success boolean and message.
+ */
+function editImageMetadata(lessonName, imageIndex, newDescription) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Lesson Database");
+    if (!sheet) {
+      return { success: false, message: "Lesson Database sheet not found." };
+    }
+
+    // Find the lesson row
+    const data = sheet.getDataRange().getValues();
+    let lessonRow = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] && data[i][0].toString().trim() === lessonName.trim()) {
+        lessonRow = i + 1; // Convert to 1-based index
+        break;
+      }
+    }
+
+    if (lessonRow === -1) {
+      return { success: false, message: "Lesson not found." };
+    }
+
+    // Calculate column index for the description
+    const descColumn = 3 + (imageIndex * 3); // Column C is index 3 for first image
+
+    // Update the description
+    sheet.getRange(lessonRow, descColumn).setValue(newDescription);
+
+    return {
+      success: true,
+      message: "Image description updated successfully."
+    };
+
+  } catch (error) {
+    Logger.log(`Edit image metadata error: ${error.toString()}`);
+    return {
+      success: false,
+      message: `Failed to edit image: ${error.toString()}`
+    };
+  }
+}
+
+/**
+ * Replaces an image by deleting the old one from Drive and uploading the new one.
+ * @param {string} lessonName The name of the lesson.
+ * @param {number} imageIndex The index of the image to replace (0-based).
+ * @param {string} base64Data The base64-encoded new image data.
+ * @param {string} mimeType The MIME type of the new image.
+ * @param {string} fileName The name for the new file.
+ * @param {string} imageDescription The description for the image.
+ * @returns {Object} Object with success boolean, new URL, and message.
+ */
+function replaceImage(lessonName, imageIndex, base64Data, mimeType, fileName, imageDescription) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Lesson Database");
+    if (!sheet) {
+      return { success: false, message: "Lesson Database sheet not found." };
+    }
+
+    // Find the lesson row
+    const data = sheet.getDataRange().getValues();
+    let lessonRow = -1;
+    let oldUrl = null;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] && data[i][0].toString().trim() === lessonName.trim()) {
+        lessonRow = i + 1; // Convert to 1-based index
+        // Get old URL
+        const urlColumn = 4 + (imageIndex * 3); // Column D is index 4 for first image URL
+        oldUrl = data[i][urlColumn - 1]; // data array is 0-based
+        break;
+      }
+    }
+
+    if (lessonRow === -1) {
+      return { success: false, message: "Lesson not found." };
+    }
+
+    // Get folder ID for the lesson
+    const folderResult = getLessonFolderId(lessonName);
+    if (!folderResult.success) {
+      return folderResult;
+    }
+
+    // Delete old file from Drive if it exists
+    if (oldUrl) {
+      const oldFileId = extractFileIdFromUrl(oldUrl);
+      if (oldFileId) {
+        try {
+          const oldFile = DriveApp.getFileById(oldFileId);
+          oldFile.setTrashed(true);
+          Logger.log(`Deleted old file: ${oldFileId}`);
+        } catch (e) {
+          Logger.log(`Could not delete old file ${oldFileId}: ${e.toString()}`);
+          // Continue anyway - the file might already be deleted
+        }
+      }
+    }
+
+    // Upload new image
+    const uploadResult = uploadImageToDrive(base64Data, mimeType, fileName, folderResult.folderId);
+    if (!uploadResult.success) {
+      return uploadResult;
+    }
+
+    // Update spreadsheet with new URL and description
+    const descColumn = 3 + (imageIndex * 3);
+    const urlColumn = 4 + (imageIndex * 3);
+
+    sheet.getRange(lessonRow, descColumn).setValue(imageDescription);
+    sheet.getRange(lessonRow, urlColumn).setValue(uploadResult.url);
+
+    return {
+      success: true,
+      url: uploadResult.url,
+      fileId: uploadResult.fileId,
+      message: "Image replaced successfully."
+    };
+
+  } catch (error) {
+    Logger.log(`Replace image error: ${error.toString()}`);
+    return {
+      success: false,
+      message: `Failed to replace image: ${error.toString()}`
+    };
+  }
+}
+
+/**
+ * Deletes an image from both the spreadsheet and Google Drive.
+ * @param {string} lessonName The name of the lesson.
+ * @param {number} imageIndex The index of the image to delete (0-based).
+ * @returns {Object} Object with success boolean and message.
+ */
+function deleteImage(lessonName, imageIndex) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Lesson Database");
+    if (!sheet) {
+      return { success: false, message: "Lesson Database sheet not found." };
+    }
+
+    // Find the lesson row
+    const data = sheet.getDataRange().getValues();
+    let lessonRow = -1;
+    let imageUrl = null;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] && data[i][0].toString().trim() === lessonName.trim()) {
+        lessonRow = i + 1; // Convert to 1-based index
+        // Get image URL
+        const urlColumn = 4 + (imageIndex * 3);
+        imageUrl = data[i][urlColumn - 1]; // data array is 0-based
+        break;
+      }
+    }
+
+    if (lessonRow === -1) {
+      return { success: false, message: "Lesson not found." };
+    }
+
+    // Delete file from Drive
+    if (imageUrl) {
+      const fileId = extractFileIdFromUrl(imageUrl);
+      if (fileId) {
+        try {
+          const file = DriveApp.getFileById(fileId);
+          file.setTrashed(true);
+          Logger.log(`Deleted file from Drive: ${fileId}`);
+        } catch (e) {
+          Logger.log(`Could not delete file ${fileId}: ${e.toString()}`);
+          // Continue anyway - the file might already be deleted
+        }
+      }
+    }
+
+    // Clear the image data from spreadsheet (description, URL, and zones)
+    const descColumn = 3 + (imageIndex * 3);
+    const urlColumn = 4 + (imageIndex * 3);
+    const zonesColumn = 5 + (imageIndex * 3);
+
+    sheet.getRange(lessonRow, descColumn).setValue("");
+    sheet.getRange(lessonRow, urlColumn).setValue("");
+    sheet.getRange(lessonRow, zonesColumn).setValue("");
+
+    return {
+      success: true,
+      message: "Image deleted successfully from spreadsheet and Drive."
+    };
+
+  } catch (error) {
+    Logger.log(`Delete image error: ${error.toString()}`);
+    return {
+      success: false,
+      message: `Failed to delete image: ${error.toString()}`
+    };
+  }
+}
+
+/**
+ * Deletes an entire lesson from both the spreadsheet and Google Drive.
+ * This will remove the lesson row from the spreadsheet and delete the lesson's folder
+ * (including all images) from Google Drive.
+ * @param {string} lessonName The name of the lesson to delete.
+ * @returns {Object} Object with success boolean and message.
+ */
+function deleteLesson(lessonName) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Lesson Database");
+    if (!sheet) {
+      return { success: false, message: "Lesson Database sheet not found." };
+    }
+
+    // Find the lesson row
+    const data = sheet.getDataRange().getValues();
+    let lessonRow = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] && data[i][0].toString().trim() === lessonName.trim()) {
+        lessonRow = i + 1; // Convert to 1-based index
+        break;
+      }
+    }
+
+    if (lessonRow === -1) {
+      return { success: false, message: "Lesson not found." };
+    }
+
+    // Get the folder for this lesson
+    const folderResult = getLessonFolderId(lessonName);
+    if (folderResult.success) {
+      try {
+        const folder = DriveApp.getFolderById(folderResult.folderId);
+
+        // Delete all files in the folder
+        const files = folder.getFiles();
+        let fileCount = 0;
+        while (files.hasNext()) {
+          const file = files.next();
+          try {
+            file.setTrashed(true);
+            fileCount++;
+            Logger.log(`Deleted file: ${file.getName()} (${file.getId()})`);
+          } catch (e) {
+            Logger.log(`Could not delete file ${file.getId()}: ${e.toString()}`);
+            // Continue with other files
+          }
+        }
+
+        // Delete the folder itself
+        folder.setTrashed(true);
+        Logger.log(`Deleted lesson folder: ${lessonName} (${folderResult.folderId}) with ${fileCount} files`);
+
+      } catch (e) {
+        Logger.log(`Error deleting Drive folder: ${e.toString()}`);
+        // Continue to delete the spreadsheet row even if Drive deletion fails
+      }
+    } else {
+      Logger.log(`Folder not found for lesson: ${lessonName}. Proceeding with spreadsheet deletion only.`);
+    }
+
+    // Delete the row from the spreadsheet
+    sheet.deleteRow(lessonRow);
+    Logger.log(`Deleted lesson row ${lessonRow} for lesson: ${lessonName}`);
+
+    return {
+      success: true,
+      message: "Lesson deleted successfully from spreadsheet and Drive."
+    };
+
+  } catch (error) {
+    Logger.log(`Delete lesson error: ${error.toString()}`);
+    return {
+      success: false,
+      message: `Failed to delete lesson: ${error.toString()}`
+    };
+  }
+}

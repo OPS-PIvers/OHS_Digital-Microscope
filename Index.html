@@ -1747,6 +1747,9 @@
                         <button onclick="editLesson(this, '${lesson.name.replace(/'/g, "&#39;")}')" class="mt-4 w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded hover:bg-blue-700 transition-all">
                             Edit Lesson
                         </button>
+                        <button onclick="deleteLessonConfirm(this, '${lesson.name.replace(/'/g, "&#39;")}')" class="mt-2 w-full px-4 py-2 bg-red-600 text-white font-semibold rounded hover:bg-red-700 transition-all">
+                            🗑️ Delete Lesson
+                        </button>
                     </div>
                 `;
                 container.appendChild(card);
@@ -1773,8 +1776,51 @@
             adminState.currentLessonTitle = lessonName;
             showImageManager(lessonName);
         }
+
+        /**
+         * Confirms and deletes an entire lesson
+         */
+        async function deleteLessonConfirm(button, lessonName) {
+            const confirmed = await showCustomModal({
+                title: '⚠️ Delete Entire Lesson?',
+                message: `Are you sure you want to permanently delete the lesson "${lessonName}"?\n\nThis will:\n• Delete all images from Google Drive\n• Delete the lesson folder from Google Drive\n• Remove the lesson from the spreadsheet\n\nThis action CANNOT be undone!`,
+                type: 'confirm'
+            });
+
+            if (!confirmed) return;
+
+            // Show loading state
+            showButtonLoader(button, 'Deleting...');
+
+            google.script.run
+                .withSuccessHandler((result) => {
+                    hideButtonLoader(button);
+                    if (result.success) {
+                        showCustomModal({
+                            title: 'Success',
+                            message: 'Lesson deleted successfully!',
+                            type: 'confirm'
+                        });
+                        // Reload the lesson list
+                        loadAdminLessons();
+                    } else {
+                        showCustomModal({
+                            title: 'Error',
+                            message: 'Failed to delete lesson: ' + result.message,
+                            type: 'confirm'
+                        });
+                    }
+                })
+                .withFailureHandler((err) => {
+                    hideButtonLoader(button);
+                    onScriptRunFailure(err);
+                })
+                .deleteLesson(lessonName);
+        }
+
         // Expose to global scope for inline onclick handlers
         window.editLesson = editLesson;
+        window.deleteLessonConfirm = deleteLessonConfirm;
 
         /**
          * Saves a new lesson
@@ -1873,10 +1919,21 @@
                 imageCard.innerHTML = `
                     <img src="${image.url}" class="w-full h-32 object-cover rounded mb-2" alt="${image.description}">
                     <p class="text-sm font-semibold">Image ${idx + 1}</p>
-                    <p class="text-xs text-gray-600 dark:text-gray-400">${image.description}</p>
-                    <button onclick="editImageZones(this, ${idx})" class="mt-2 w-full px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
-                        Edit Zones
-                    </button>
+                    <p class="text-xs text-gray-600 dark:text-gray-400 mb-2" id="image-desc-${idx}">${image.description}</p>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="editImageDescription(${idx})" class="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">
+                            ✏️ Edit Info
+                        </button>
+                        <button onclick="editImageZones(this, ${idx})" class="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">
+                            📍 Edit Zones
+                        </button>
+                        <button onclick="replaceImageFile(${idx})" class="px-2 py-1 bg-yellow-600 text-white text-xs rounded hover:bg-yellow-700">
+                            🔄 Replace
+                        </button>
+                        <button onclick="deleteImageFile(${idx})" class="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700">
+                            🗑️ Delete
+                        </button>
+                    </div>
                 `;
                 container.appendChild(imageCard);
             });
@@ -2288,8 +2345,139 @@
                  })
                 .getLessonForEditing(adminState.currentLessonTitle);
         }
+
+        /**
+         * Edits an image's description
+         */
+        async function editImageDescription(imageIndex) {
+            const image = adminState.lessonImages[imageIndex];
+            const newDescription = await showCustomModal({
+                title: 'Edit Image Description',
+                message: 'Enter new description for this image:',
+                type: 'prompt',
+                placeholder: image.description
+            });
+
+            if (newDescription === null || newDescription.trim() === '') {
+                return; // User cancelled or entered empty string
+            }
+
+            // Update in backend
+            google.script.run
+                .withSuccessHandler((result) => {
+                    if (result.success) {
+                        // Update the UI
+                        const descElement = document.getElementById(`image-desc-${imageIndex}`);
+                        if (descElement) {
+                            descElement.textContent = newDescription;
+                        }
+                        // Update local state
+                        adminState.lessonImages[imageIndex].description = newDescription;
+                        showCustomModal({ title: 'Success', message: 'Image description updated successfully!', type: 'confirm'});
+                    } else {
+                        showCustomModal({ title: 'Error', message: 'Failed to update: ' + result.message, type: 'confirm'});
+                    }
+                })
+                .withFailureHandler(onScriptRunFailure)
+                .editImageMetadata(adminState.currentLessonTitle, imageIndex, newDescription);
+        }
+
+        /**
+         * Replaces an existing image file
+         */
+        async function replaceImageFile(imageIndex) {
+            const image = adminState.lessonImages[imageIndex];
+            const confirmed = await showCustomModal({
+                title: 'Replace Image',
+                message: `Replace image ${imageIndex + 1}? This will delete the old file from Drive and upload a new one.`,
+                type: 'confirm'
+            });
+
+            if (!confirmed) return;
+
+            // Create file input
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = 'image/*';
+            fileInput.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                // Read file as base64
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    const base64Data = event.target.result.split(',')[1];
+                    const mimeType = event.target.result.split(';')[0].split(':')[1];
+                    const fileName = `image_${imageIndex + 1}_${Date.now()}.${mimeType.split('/')[1]}`;
+                    const description = image.description; // Keep existing description
+
+                    // Show loading state
+                    const container = document.getElementById('existing-images-list');
+                    const originalHTML = container.innerHTML;
+                    showSkeletonLoader(container, adminState.lessonImages.length, 'image');
+
+                    google.script.run
+                        .withSuccessHandler((result) => {
+                            if (result.success) {
+                                showCustomModal({ title: 'Success', message: 'Image replaced successfully!', type: 'confirm'});
+                                // Reload images
+                                loadExistingImages(adminState.currentLessonTitle);
+                            } else {
+                                container.innerHTML = originalHTML;
+                                showCustomModal({ title: 'Error', message: 'Failed to replace: ' + result.message, type: 'confirm'});
+                            }
+                        })
+                        .withFailureHandler((err) => {
+                            container.innerHTML = originalHTML;
+                            onScriptRunFailure(err);
+                        })
+                        .replaceImage(adminState.currentLessonTitle, imageIndex, base64Data, mimeType, fileName, description);
+                };
+                reader.readAsDataURL(file);
+            };
+            fileInput.click();
+        }
+
+        /**
+         * Deletes an image file
+         */
+        async function deleteImageFile(imageIndex) {
+            const confirmed = await showCustomModal({
+                title: 'Delete Image',
+                message: `Are you sure you want to delete image ${imageIndex + 1}? This will permanently remove it from both the spreadsheet and Google Drive. This action cannot be undone.`,
+                type: 'confirm'
+            });
+
+            if (!confirmed) return;
+
+            // Show loading state
+            const container = document.getElementById('existing-images-list');
+            const originalHTML = container.innerHTML;
+            showSkeletonLoader(container, adminState.lessonImages.length, 'image');
+
+            google.script.run
+                .withSuccessHandler((result) => {
+                    if (result.success) {
+                        showCustomModal({ title: 'Success', message: 'Image deleted successfully!', type: 'confirm'});
+                        // Reload images
+                        loadExistingImages(adminState.currentLessonTitle);
+                    } else {
+                        container.innerHTML = originalHTML;
+                        showCustomModal({ title: 'Error', message: 'Failed to delete: ' + result.message, type: 'confirm'});
+                    }
+                })
+                .withFailureHandler((err) => {
+                    container.innerHTML = originalHTML;
+                    onScriptRunFailure(err);
+                })
+                .deleteImage(adminState.currentLessonTitle, imageIndex);
+        }
+
         // Expose to global scope for inline onclick handlers
         window.editImageZones = editImageZones;
+        window.editImageDescription = editImageDescription;
+        window.replaceImageFile = replaceImageFile;
+        window.deleteImageFile = deleteImageFile;
 
         // Event listeners for all buttons
         document.addEventListener('DOMContentLoaded', () => {
