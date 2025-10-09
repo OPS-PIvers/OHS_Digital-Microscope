@@ -100,29 +100,25 @@
 
         /* Focus slider */
         #focus-slider-container {
-            position: absolute;
-            right: 20px;
-            top: 50%;
-            transform: translateY(-50%);
-            z-index: 100;
             display: none;
             flex-direction: column;
             align-items: center;
             gap: 12px;
+            flex-shrink: 0;
         }
         #focus-slider-container.visible {
             display: flex;
-            animation: slideIn 0.5s ease-out;
+            animation: fadeIn 0.5s ease-out;
         }
 
-        @keyframes slideIn {
+        @keyframes fadeIn {
             from {
                 opacity: 0;
-                right: -50px;
+                transform: translateX(20px);
             }
             to {
                 opacity: 1;
-                right: 20px;
+                transform: translateX(0);
             }
         }
 
@@ -206,6 +202,33 @@
             transform: translateY(-5px);
             box-shadow: 0 10px 20px rgba(0,0,0,0.1);
         }
+        
+        /* Skeleton Loader */
+        .skeleton {
+            background-color: #e2e8f0; /* bg-gray-200 */
+            border-radius: 0.5rem; /* rounded-lg */
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        .dark .skeleton {
+            background-color: #374151; /* dark:bg-gray-700 */
+        }
+        @keyframes pulse {
+            50% {
+                opacity: .5;
+            }
+        }
+
+        /* Button Loader Spinner */
+        .btn-spinner {
+            display: inline-block;
+            width: 1.25rem; /* w-5 */
+            height: 1.25rem; /* h-5 */
+            border: 2px solid transparent;
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin-right: 0.5rem; /* mr-2 */
+        }
     </style>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 flex items-center justify-center min-h-screen p-4">
@@ -279,6 +302,7 @@
                 </div>
 
                 <div class="relative w-full max-w-3xl mx-auto bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden border-2 border-gray-300 dark:border-gray-600" id="canvas-wrapper">
+                    <div id="canvas-loader" class="absolute inset-0 bg-gray-200/50 dark:bg-gray-800/50 flex items-center justify-center hidden z-10"><div class="loader"></div></div>
                     <canvas id="coord-canvas" class="w-full cursor-crosshair"></canvas>
                 </div>
 
@@ -358,10 +382,12 @@
             <div id="simulation-loader" class="flex justify-center items-center p-8 hidden">
                 <div class="loader"></div>
             </div>
-            <div id="simulation-container" class="relative w-full max-w-3xl mx-auto aspect-video rounded-lg overflow-hidden shadow-inner border border-gray-200 dark:border-gray-700">
-                <img id="main-image" src="" alt="Anatomy diagram" class="w-full h-full object-contain microscope-image">
-                <img id="next-image" src="" alt="Next anatomy diagram" class="w-full h-full object-contain microscope-image" style="opacity: 0; pointer-events: none;">
-                <div id="zones-overlay"></div>
+            <div class="flex items-center justify-center gap-6 w-full max-w-5xl mx-auto">
+                <div id="simulation-container" class="relative w-full max-w-3xl aspect-video rounded-lg overflow-hidden shadow-inner border border-gray-200 dark:border-gray-700">
+                    <img id="main-image" src="" alt="Anatomy diagram" class="w-full h-full object-contain microscope-image">
+                    <img id="next-image" src="" alt="Next anatomy diagram" class="w-full h-full object-contain microscope-image" style="opacity: 0; pointer-events: none;">
+                    <div id="zones-overlay"></div>
+                </div>
                 <div id="focus-slider-container">
                     <div id="focus-slider-label">🔬 Adjust Focus</div>
                     <input type="range" id="focus-slider" min="0" max="100" value="50" orient="vertical">
@@ -492,6 +518,7 @@
                 </div>
 
                 <div class="relative w-full max-w-3xl mx-auto bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden border-2 border-gray-300 dark:border-gray-600" id="admin-canvas-wrapper">
+                    <div id="admin-canvas-loader" class="absolute inset-0 bg-gray-200/50 dark:bg-gray-800/50 flex items-center justify-center hidden z-10"><div class="loader"></div></div>
                     <canvas id="admin-canvas" class="w-full cursor-crosshair"></canvas>
                 </div>
 
@@ -537,11 +564,28 @@
                 <div id="admin-login-error" class="hidden mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-lg text-sm">
                 </div>
                 <div class="flex gap-2">
-                    <button id="admin-login-btn" class="flex-1 px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-all">
+                    <button id="admin-login-btn" class="flex-1 px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-all flex items-center justify-center">
                         Login
                     </button>
                     <button id="admin-login-cancel" class="flex-1 px-6 py-2 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 transition-all">
                         Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Generic Modal for Confirm/Prompt -->
+        <div id="custom-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden">
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all" id="modal-content">
+                <h2 id="modal-title" class="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-4">Confirmation</h2>
+                <p id="modal-message" class="text-gray-600 dark:text-gray-400 mb-6">Are you sure?</p>
+                <input type="text" id="modal-input" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 hidden mb-4">
+                <div class="flex gap-4 justify-end">
+                    <button id="modal-cancel-btn" class="px-6 py-2 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 transition-all">
+                        Cancel
+                    </button>
+                    <button id="modal-confirm-btn" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-all">
+                        Confirm
                     </button>
                 </div>
             </div>
@@ -564,6 +608,203 @@
             TOOL_MODE = '';
         }
 
+        // --- CUSTOM MODAL & NOTIFICATION LOGIC ---
+        let modalResolve = null;
+
+        /**
+         * Shows a custom modal for confirmations or prompts. Returns a Promise.
+         * @param {object} options - { title, message, type ('confirm'|'prompt'|'select'), placeholder, options }
+         * @returns {Promise<boolean|string|null>}
+         */
+        function showCustomModal({ title, message, type = 'confirm', placeholder = '', options = [] }) {
+            return new Promise(resolve => {
+                modalResolve = resolve;
+
+                const modal = document.getElementById('custom-modal');
+                const modalTitle = document.getElementById('modal-title');
+                const modalMessage = document.getElementById('modal-message');
+                const modalInput = document.getElementById('modal-input');
+                const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+
+                modalTitle.textContent = title;
+                modalMessage.textContent = message;
+
+                if (type === 'prompt') {
+                    modalInput.classList.remove('hidden');
+                    modalInput.value = '';
+                    modalInput.placeholder = placeholder;
+                    modalInput.type = 'text';
+                    modalConfirmBtn.textContent = 'Submit';
+                } else if (type === 'select') {
+                    // Convert input to select element
+                    const selectHtml = `<select id="modal-select" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4">
+                        ${options.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('')}
+                    </select>`;
+                    modalInput.classList.add('hidden');
+
+                    // Insert select before the buttons
+                    const existingSelect = document.getElementById('modal-select');
+                    if (existingSelect) {
+                        existingSelect.remove();
+                    }
+                    modalInput.insertAdjacentHTML('afterend', selectHtml);
+                    modalConfirmBtn.textContent = 'Submit';
+                } else {
+                    modalInput.classList.add('hidden');
+                    const existingSelect = document.getElementById('modal-select');
+                    if (existingSelect) {
+                        existingSelect.remove();
+                    }
+                    modalConfirmBtn.textContent = 'Confirm';
+                }
+
+                modal.classList.remove('hidden');
+            });
+        }
+
+        function handleModalConfirm() {
+            const modalInput = document.getElementById('modal-input');
+            const modalSelect = document.getElementById('modal-select');
+            if (modalResolve) {
+                if (modalSelect) {
+                    // Select type modal
+                    modalResolve(modalSelect.value);
+                } else if (!modalInput.classList.contains('hidden')) {
+                    // Prompt type modal
+                    modalResolve(modalInput.value);
+                } else {
+                    // Confirm type modal
+                    modalResolve(true);
+                }
+            }
+            closeModal();
+        }
+
+        function handleModalCancel() {
+            if (modalResolve) {
+                const modalInput = document.getElementById('modal-input');
+                modalResolve(!modalInput.classList.contains('hidden') ? null : false);
+            }
+            closeModal();
+        }
+
+        function closeModal() {
+            document.getElementById('custom-modal').classList.add('hidden');
+            modalResolve = null;
+        }
+
+        /**
+         * Generic failure handler for google.script.run calls. Displays a toast notification.
+         * @param {Error} error The error object from the failed call.
+         */
+        function onScriptRunFailure(error) {
+            console.error('Google Script run failed:', error);
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-5 right-5 bg-red-600 text-white py-3 px-6 rounded-lg shadow-lg z-50 transition-transform transform translate-y-20';
+            toast.textContent = `Server Error: ${error.message}`;
+            document.body.appendChild(toast);
+            // Animate in
+            setTimeout(() => {
+                toast.classList.remove('translate-y-20');
+            }, 10);
+            // Animate out and remove
+            setTimeout(() => {
+                toast.classList.add('translate-y-20');
+                setTimeout(() => toast.remove(), 500);
+            }, 5000);
+        }
+        
+        // --- LOADER/SPINNER UTILITY FUNCTIONS ---
+
+        /**
+         * Shows a loading state on a button.
+         * @param {HTMLElement} button The button element to update.
+         * @param {string} loadingText The text to display while loading.
+         */
+        function showButtonLoader(button, loadingText = 'Loading...') {
+            if (!button) return;
+            button.disabled = true;
+            // Store original content if it doesn't exist
+            if (!button.dataset.originalContent) {
+                button.dataset.originalContent = button.innerHTML;
+            }
+            button.innerHTML = `<span class="btn-spinner"></span> ${loadingText}`;
+        }
+
+        /**
+         * Hides the loading state on a button and restores its original content.
+         * @param {HTMLElement} button The button element to restore.
+         */
+        function hideButtonLoader(button) {
+            if (!button) return;
+            button.disabled = false;
+            if (button.dataset.originalContent) {
+                button.innerHTML = button.dataset.originalContent;
+            }
+        }
+
+        /**
+         * Generates and displays skeleton cards.
+         * @param {HTMLElement} container The container to fill with skeleton cards.
+         * @param {number} count The number of skeleton cards to generate.
+         * @param {string} type 'lesson' or 'image' to apply different height classes.
+         */
+        function showSkeletonLoader(container, count = 3, type = 'lesson') {
+            if (!container) return;
+            container.innerHTML = '';
+            const heightClass = type === 'lesson' ? 'h-64' : 'h-72';
+            for (let i = 0; i < count; i++) {
+                const skeletonCard = document.createElement('div');
+                skeletonCard.className = `skeleton ${heightClass}`;
+                container.appendChild(skeletonCard);
+            }
+        }
+
+        /**
+         * Shows a loading state on a card element (lesson/image card).
+         * @param {HTMLElement} card The card element to update.
+         */
+        function showCardLoader(card) {
+            if (!card) return;
+            // Store original state
+            card.dataset.originalCursor = card.style.cursor || '';
+            card.dataset.wasDisabled = card.style.pointerEvents || '';
+
+            // Disable interactions and add visual feedback
+            card.style.pointerEvents = 'none';
+            card.style.opacity = '0.6';
+            card.style.cursor = 'wait';
+
+            // Add spinner overlay
+            const spinner = document.createElement('div');
+            spinner.className = 'absolute inset-0 flex items-center justify-center bg-white bg-opacity-50 dark:bg-gray-800 dark:bg-opacity-50 z-10';
+            spinner.innerHTML = '<div class="loader"></div>';
+            spinner.dataset.cardSpinner = 'true';
+            card.style.position = 'relative';
+            card.appendChild(spinner);
+        }
+
+        /**
+         * Hides the loading state on a card element.
+         * @param {HTMLElement} card The card element to restore.
+         */
+        function hideCardLoader(card) {
+            if (!card) return;
+            // Restore original state
+            card.style.pointerEvents = card.dataset.wasDisabled || '';
+            card.style.opacity = '1';
+            card.style.cursor = card.dataset.originalCursor || '';
+
+            // Remove spinner overlay
+            const spinner = card.querySelector('[data-card-spinner="true"]');
+            if (spinner) {
+                spinner.remove();
+            }
+        }
+
+
+        // --- MAIN APP LOGIC ---
+
         // DOM Element References
         const landingPage = document.getElementById('landing-page');
         const simulationView = document.getElementById('simulation-view');
@@ -583,6 +824,7 @@
 
         let currentLessonViews = [];
         let currentViewIndex = -1;
+        let viewHistory = []; // Stack to track navigation history for back button
         let awaitingFocusAdjustment = false;
         let optimalFocusValue = 50; // The "correct" slider position for sharp focus
 
@@ -593,7 +835,11 @@
             loaderContainer.style.display = 'none';
             lessonCardsContainer.innerHTML = ''; // Clear previous cards
 
-            if (lessons.length > 0 && lessons[0].error) {
+            if (!lessons || lessons.length === 0) {
+                lessonCardsContainer.innerHTML = `<p class="text-gray-500 col-span-full text-center">No lessons found. Please add lessons in the 'Lesson Database' sheet.</p>`;
+                return;
+            }
+            if (lessons[0].error) {
                 lessonCardsContainer.innerHTML = `<p class="text-red-500 col-span-full text-center">${lessons[0].error}</p>`;
                 return;
             }
@@ -608,7 +854,10 @@
                         <p class="text-gray-600 dark:text-gray-400 text-sm mt-1">${lesson.description || 'No description available.'}</p>
                     </div>
                 `;
-                card.addEventListener('click', () => selectLesson(lesson.name));
+                card.addEventListener('click', () => {
+                    showCardLoader(card);
+                    selectLesson(lesson.name);
+                });
                 lessonCardsContainer.appendChild(card);
             });
         }
@@ -623,7 +872,10 @@
             simulationContainer.style.display = 'none';
             lessonTitle.textContent = lessonName;
             
-            google.script.run.withSuccessHandler(startLesson).getLessonData(lessonName);
+            google.script.run
+                .withSuccessHandler(startLesson)
+                .withFailureHandler(onScriptRunFailure)
+                .getLessonData(lessonName);
         }
 
         /**
@@ -633,7 +885,8 @@
             simulationLoader.style.display = 'none';
             simulationContainer.style.display = 'block';
             currentLessonViews = viewsData;
-            
+            viewHistory = []; // Clear navigation history for new lesson
+
             if (currentLessonViews.length === 0) {
                 instructionText.textContent = "This lesson has no images to display.";
                 simulationContainer.style.display = 'none';
@@ -715,13 +968,24 @@
                 zoneDiv.addEventListener('click', (e) => {
                     console.log(`Zone ${index} clicked!`);
                     e.stopPropagation();
-                    zoomToNextView();
+
+                    // Check if zone has a specific target view
+                    if (zone.targetView !== undefined && zone.targetView !== null) {
+                        const targetIndex = parseInt(zone.targetView);
+                        if (targetIndex >= 0 && targetIndex < currentLessonViews.length) {
+                            navigateToView(targetIndex);
+                        } else {
+                            console.error(`Invalid targetView ${targetIndex} for zone ${index}`);
+                            zoomToNextView(); // Fallback to sequential navigation
+                        }
+                    } else {
+                        // Default behavior: advance to next view sequentially
+                        zoomToNextView();
+                    }
                 });
 
                 zonesOverlay.appendChild(zoneDiv);
             });
-
-            console.log('Zone overlays created successfully');
         }
 
         /**
@@ -730,130 +994,153 @@
         function zoomToNextView() {
             if (currentViewIndex + 1 >= currentLessonViews.length) return;
 
-            // Remove all zones during zoom
+            // Add current view to history before navigating
+            viewHistory.push(currentViewIndex);
+
             zonesOverlay.innerHTML = '';
             simulationContainer.classList.remove('has-zones');
 
             const nextView = currentLessonViews[currentViewIndex + 1];
 
-            // Pre-apply the blurred zoom state to next image BEFORE loading
             nextImage.classList.add('zoom-out-blurry');
-            nextImage.style.opacity = '0'; // Start invisible
-
-            // Preload the next image
+            nextImage.style.opacity = '0';
             nextImage.src = nextView.imageUrl;
 
             nextImage.onload = () => {
-                // Phase 1: Start zoom and blur on current image
                 mainImage.classList.add('zoom-in');
 
                 setTimeout(() => {
-                    // Phase 2: Crossfade - current image fades out while blurring more
-                    // next image fades in (already blurred/zoomed from pre-applied class)
                     mainImage.classList.add('crossfade-out');
                     nextImage.classList.add('crossfade-in');
                     nextImage.style.opacity = '1';
 
                     setTimeout(() => {
-                        // Phase 3: Swap images - make next image the main image
                         currentViewIndex++;
                         instructionText.textContent = nextView.description;
 
-                        // Reset main image
                         mainImage.src = nextView.imageUrl;
                         mainImage.classList.remove('zoom-in', 'crossfade-out');
                         mainImage.classList.add('zoom-out-blurry');
                         mainImage.style.opacity = '1';
 
-                        // Hide and reset next image
                         nextImage.style.opacity = '0';
                         nextImage.classList.remove('crossfade-in', 'zoom-out-blurry');
 
-                        // Show focus slider and randomize starting position
                         awaitingFocusAdjustment = true;
 
-                        // Set slider to random position (avoiding the optimal zone)
-                        // This simulates starting with an unfocused microscope
                         const randomStart = Math.random() > 0.5
                             ? Math.floor(Math.random() * 30) + 10  // 10-40 range
                             : Math.floor(Math.random() * 30) + 60; // 60-90 range
                         focusSlider.value = randomStart;
 
-                        // Apply initial blur and scale based on random position
                         const initialBlur = calculateBlurAmount(randomStart);
                         const initialScale = calculateScale(randomStart);
                         mainImage.style.filter = `blur(${initialBlur}px)`;
                         mainImage.style.transform = `scale(${initialScale})`;
 
-                        // Add class for faster transitions during adjustment
                         mainImage.classList.add('adjusting-focus');
-
                         focusSliderContainer.classList.add('visible');
+                        backButton.classList.toggle('hidden', viewHistory.length === 0);
+                    }, 800);
+                }, 1200);
+            };
+        }
 
-                        backButton.classList.toggle('hidden', currentViewIndex === 0);
-                    }, 800); // Match the crossfade transition duration
-                }, 1200); // Zoom duration before crossfade starts
+        /**
+         * Navigates to a specific view by index (used for zone-based navigation).
+         * @param {number} targetIndex - The index of the view to navigate to
+         */
+        function navigateToView(targetIndex) {
+            if (targetIndex === currentViewIndex) {
+                console.log('Already at target view');
+                return;
+            }
+
+            if (targetIndex < 0 || targetIndex >= currentLessonViews.length) {
+                console.error(`Invalid target index: ${targetIndex}`);
+                return;
+            }
+
+            // Add current view to history before navigating
+            viewHistory.push(currentViewIndex);
+            console.log(`Navigating from view ${currentViewIndex} to view ${targetIndex}. History:`, viewHistory);
+
+            zonesOverlay.innerHTML = '';
+            simulationContainer.classList.remove('has-zones');
+
+            const targetView = currentLessonViews[targetIndex];
+
+            nextImage.classList.add('zoom-out-blurry');
+            nextImage.style.opacity = '0';
+            nextImage.src = targetView.imageUrl;
+
+            nextImage.onload = () => {
+                mainImage.classList.add('zoom-in');
+
+                setTimeout(() => {
+                    mainImage.classList.add('crossfade-out');
+                    nextImage.classList.add('crossfade-in');
+                    nextImage.style.opacity = '1';
+
+                    setTimeout(() => {
+                        currentViewIndex = targetIndex;
+                        instructionText.textContent = targetView.description;
+
+                        mainImage.src = targetView.imageUrl;
+                        mainImage.classList.remove('zoom-in', 'crossfade-out');
+                        mainImage.classList.add('zoom-out-blurry');
+                        mainImage.style.opacity = '1';
+
+                        nextImage.style.opacity = '0';
+                        nextImage.classList.remove('crossfade-in', 'zoom-out-blurry');
+
+                        awaitingFocusAdjustment = true;
+
+                        const randomStart = Math.random() > 0.5
+                            ? Math.floor(Math.random() * 30) + 10  // 10-40 range
+                            : Math.floor(Math.random() * 30) + 60; // 60-90 range
+                        focusSlider.value = randomStart;
+
+                        const initialBlur = calculateBlurAmount(randomStart);
+                        const initialScale = calculateScale(randomStart);
+                        mainImage.style.filter = `blur(${initialBlur}px)`;
+                        mainImage.style.transform = `scale(${initialScale})`;
+
+                        mainImage.classList.add('adjusting-focus');
+                        focusSliderContainer.classList.add('visible');
+                        backButton.classList.toggle('hidden', viewHistory.length === 0);
+                    }, 800);
+                }, 1200);
             };
         }
 
         /**
          * Calculates the blur amount based on slider position.
-         * The optimal focus is at position 50 (center of 0-100 range).
-         * Distance from 50 increases blur, simulating over/under focusing.
          */
         function calculateBlurAmount(sliderValue) {
             const distance = Math.abs(sliderValue - optimalFocusValue);
-
-            // Define the "in-focus" zone (45-55)
             if (distance <= 5) {
-                // Within optimal range - minimal to no blur
-                return distance * 0.5; // 0-2.5px blur
+                return distance * 0.5;
             } else {
-                // Outside optimal range - progressive blur
-                // Max blur at extremes (0 or 100) should be around 20px
-                return 2.5 + (distance - 5) * 0.4; // Starts at 2.5px, increases progressively
+                return 2.5 + (distance - 5) * 0.4;
             }
         }
 
         /**
          * Calculates the scale transformation based on slider position.
-         * The optimal scale is 1.0 at position 50.
-         * Moving away from 50 changes the scale (too small or too large).
          */
         function calculateScale(sliderValue) {
-            const normalizedValue = sliderValue / 100; // 0 to 1
-            const optimalNormalized = optimalFocusValue / 100; // 0.5
-
-            // Create a parabolic curve where:
-            // - At slider=0: scale=0.7 (too small/far away)
-            // - At slider=50: scale=1.0 (perfect size)
-            // - At slider=100: scale=1.4 (too large/too close)
-
-            // Use a parabola: scale = a(x - 0.5)² + 1.0
-            // We want it to reach 0.7 at x=0 and 1.4 at x=1
-            const a = 1.6; // Coefficient that controls curve steepness
-            const scale = 1.0 - a * Math.pow(normalizedValue - optimalNormalized, 2);
-
-            // Adjust to get desired range
-            // When x=0: 1.0 - 1.6(0.5)² = 1.0 - 0.4 = 0.6
-            // When x=0.5: 1.0 - 1.6(0)² = 1.0
-            // When x=1: 1.0 - 1.6(0.5)² = 1.0 - 0.4 = 0.6
-
-            // Actually, let's use a different approach for asymmetric scaling
             if (sliderValue < optimalFocusValue) {
-                // Below optimal: scale from 0.65 to 1.0
-                const t = sliderValue / optimalFocusValue; // 0 to 1
+                const t = sliderValue / optimalFocusValue;
                 return 0.65 + (0.35 * t);
             } else {
-                // Above optimal: scale from 1.0 to 1.5
-                const t = (sliderValue - optimalFocusValue) / (100 - optimalFocusValue); // 0 to 1
+                const t = (sliderValue - optimalFocusValue) / (100 - optimalFocusValue);
                 return 1.0 + (0.5 * t);
             }
         }
 
         /**
          * Updates the image blur and scale based on slider position.
-         * Also manages zone visibility - zones only appear when perfectly focused.
          */
         function updateFocusBlur() {
             if (!awaitingFocusAdjustment) return;
@@ -861,19 +1148,15 @@
             const blurAmount = calculateBlurAmount(focusSlider.value);
             const scale = calculateScale(focusSlider.value);
 
-            // Apply both blur and scale transformations
             mainImage.style.filter = `blur(${blurAmount}px)`;
             mainImage.style.transform = `scale(${scale})`;
 
-            // Check if student found optimal focus
             const distance = Math.abs(focusSlider.value - optimalFocusValue);
             const currentView = currentLessonViews[currentViewIndex];
 
             if (distance <= 5) {
-                // Within optimal range - show zones
                 createZoneOverlays(currentView.zones);
             } else {
-                // Out of focus - hide zones
                 zonesOverlay.innerHTML = '';
                 simulationContainer.classList.remove('has-zones');
             }
@@ -902,7 +1185,8 @@
             mainImage.onload = () => {
                 // Create clickable zones if they exist
                 createZoneOverlays(view.zones);
-                backButton.classList.toggle('hidden', viewIndex === 0);
+                // Show back button if there's history or if not at the first view
+                backButton.classList.toggle('hidden', viewHistory.length === 0 && viewIndex === 0);
             };
         }
 
@@ -927,12 +1211,20 @@
             }
         });
 
-        // Focus slider event listener
         focusSlider.addEventListener('input', updateFocusBlur);
 
         backButton.addEventListener('click', (e) => {
             e.stopPropagation();
-            renderView(currentViewIndex - 1);
+
+            // Use history stack if available, otherwise go to previous sequential view
+            if (viewHistory.length > 0) {
+                const previousViewIndex = viewHistory.pop();
+                console.log(`Going back to view ${previousViewIndex}. Remaining history:`, viewHistory);
+                renderView(previousViewIndex);
+            } else if (currentViewIndex > 0) {
+                // Fallback to sequential navigation if no history
+                renderView(currentViewIndex - 1);
+            }
         });
 
         backToLessonsButton.addEventListener('click', () => {
@@ -943,38 +1235,37 @@
             zonesOverlay.innerHTML = '';
             awaitingFocusAdjustment = false;
             focusSliderContainer.classList.remove('visible');
-            mainImage.style.filter = ''; // Clear blur
-            mainImage.style.transform = ''; // Clear scale
+            mainImage.style.filter = '';
+            mainImage.style.transform = '';
             mainImage.classList.remove('adjusting-focus');
+
+            // Remove loading spinners from all lesson cards
+            const allCards = lessonCardsContainer.querySelectorAll('.lesson-card');
+            allCards.forEach(card => hideCardLoader(card));
         });
 
         // --- INITIALIZATION ---
         window.addEventListener('load', () => {
             try {
-                // Debug logging for tool mode
-                console.log('Server-injected TOOL_MODE:', TOOL_MODE);
-                console.log('Full URL:', window.location.href);
-
-                // Check if we're in coordinate helper mode using server-injected variable
                 if (TOOL_MODE === 'coordinates') {
-                    console.log('Coordinate Helper Mode Detected - Initializing...');
                     initializeCoordinateHelper();
                     return;
                 }
-
-                // Load lessons directly
                 if (typeof google !== 'undefined' && google.script && google.script.run) {
-                    google.script.run.withSuccessHandler(buildLandingPage).getLessons();
+                    google.script.run
+                        .withSuccessHandler(buildLandingPage)
+                        .withFailureHandler(onScriptRunFailure)
+                        .getLessons();
                 } else {
                     console.error('Google Apps Script API not available');
-                    lessonCardsContainer.innerHTML = '<p class="text-red-500 col-span-full text-center">Unable to connect to Google Apps Script. Please refresh the page.</p>';
+                    lessonCardsContainer.innerHTML = '<p class="text-red-500 col-span-full text-center">Unable to connect to Google Apps Script. Please refresh.</p>';
                     loaderContainer.style.display = 'none';
                 }
             } catch (error) {
                 console.error('Initialization error:', error);
                 if (loaderContainer) loaderContainer.style.display = 'none';
                 if (lessonCardsContainer) {
-                    lessonCardsContainer.innerHTML = '<p class="text-red-500 col-span-full text-center">An error occurred during initialization. Please refresh the page.</p>';
+                    lessonCardsContainer.innerHTML = '<p class="text-red-500 col-span-full text-center">An error occurred during initialization. Please refresh.</p>';
                 }
             }
         });
@@ -984,29 +1275,18 @@
         // ==============================
 
         let coordHelperState = {
-            canvas: null,
-            ctx: null,
-            image: null,
-            zones: [],
-            isDrawing: false,
-            startX: 0,
-            startY: 0,
-            currentZone: null,
-            initialized: false, // Guard to prevent duplicate initialization
-            currentLesson: null, // Track current lesson name
-            currentImageIndex: null, // Track current image index
-            currentImageDesc: null // Track current image description
+            canvas: null, ctx: null, image: null, zones: [], isDrawing: false,
+            startX: 0, startY: 0, currentZone: null, initialized: false,
+            currentLesson: null, currentImageIndex: null, currentImageDesc: null,
+            lessonImages: [] // Store all images in the lesson for target selection
         };
 
-        /**
-         * Builds the lesson cards for the coordinate helper landing page
-         */
         function buildCoordinateHelperLandingPage(lessons) {
             const coordLoaderContainer = document.getElementById('coord-loader-container');
             const coordLessonCardsContainer = document.getElementById('coord-lesson-cards-container');
 
             coordLoaderContainer.style.display = 'none';
-            coordLessonCardsContainer.innerHTML = ''; // Clear previous cards
+            coordLessonCardsContainer.innerHTML = '';
 
             if (lessons.length > 0 && lessons[0].error) {
                 coordLessonCardsContainer.innerHTML = `<p class="text-red-500 col-span-full text-center">${lessons[0].error}</p>`;
@@ -1023,34 +1303,37 @@
                         <p class="text-gray-600 dark:text-gray-400 text-sm mt-1">${lesson.description || 'No description available.'}</p>
                     </div>
                 `;
-                card.addEventListener('click', () => selectLessonForCoordinates(lesson.name));
+                card.addEventListener('click', () => {
+                    showCardLoader(card);
+                    selectLessonForCoordinates(lesson.name);
+                });
                 coordLessonCardsContainer.appendChild(card);
             });
         }
 
-        /**
-         * Handles lesson selection in coordinate helper mode
-         */
         function selectLessonForCoordinates(lessonName) {
-            console.log('Selecting lesson for coordinates:', lessonName);
-
-            // Hide lesson selection, show image selection with loader
             document.getElementById('coord-lesson-selection').classList.add('hidden');
             document.getElementById('coord-image-selection').classList.remove('hidden');
             document.getElementById('coord-lesson-title').textContent = lessonName;
-
             coordHelperState.currentLesson = lessonName;
-
-            // Load images for this lesson
-            google.script.run.withSuccessHandler(displayImagesForCoordinates).getLessonDataForCoordinates(lessonName);
+            
+            showSkeletonLoader(document.getElementById('coord-images-grid'), 2, 'image');
+            
+            google.script.run
+                .withSuccessHandler(displayImagesForCoordinates)
+                .withFailureHandler((err) => {
+                    document.getElementById('coord-images-grid').innerHTML = '';
+                    onScriptRunFailure(err);
+                })
+                .getLessonDataForCoordinates(lessonName);
         }
 
-        /**
-         * Displays the image selection grid for a lesson
-         */
         function displayImagesForCoordinates(images) {
             const coordImagesGrid = document.getElementById('coord-images-grid');
-            coordImagesGrid.innerHTML = ''; // Clear previous images
+            coordImagesGrid.innerHTML = '';
+
+            // Store images for target selection
+            coordHelperState.lessonImages = images;
 
             if (images.length === 0) {
                 coordImagesGrid.innerHTML = '<p class="text-gray-500 col-span-full text-center">This lesson has no images.</p>';
@@ -1067,229 +1350,108 @@
                         <p class="text-gray-600 dark:text-gray-400 text-sm mt-1">${image.description}</p>
                     </div>
                 `;
-                imageCard.addEventListener('click', () => selectImageForCoordinates(image.imageUrl, image.description, image.index));
+                imageCard.addEventListener('click', () => {
+                    showCardLoader(imageCard);
+                    selectImageForCoordinates(image.imageUrl, image.description, image.index);
+                });
                 coordImagesGrid.appendChild(imageCard);
             });
         }
 
-        /**
-         * Loads the selected image into the canvas editor
-         */
         function selectImageForCoordinates(imageUrl, description, imageIndex) {
-            console.log('Selecting image for coordinates:', imageUrl);
-
-            // Hide image selection, show canvas editor
             document.getElementById('coord-image-selection').classList.add('hidden');
             document.getElementById('coord-canvas-editor').classList.remove('hidden');
-
-            // Update header
             document.getElementById('coord-canvas-title').textContent = `Zone Editor: ${coordHelperState.currentLesson}`;
             document.getElementById('coord-canvas-subtitle').textContent = `Loading image...`;
-
-            // Update context info for JSON output
             document.getElementById('json-lesson-name').textContent = coordHelperState.currentLesson;
             document.getElementById('json-image-index').textContent = `Image ${imageIndex + 1}`;
             document.getElementById('json-image-desc').textContent = description;
 
-            // Store current context
             coordHelperState.currentImageIndex = imageIndex;
             coordHelperState.currentImageDesc = description;
-
-            // Clear any existing zones
             coordHelperState.zones = [];
             updateZonesList();
             updateJsonOutput();
+            
+            const canvasLoader = document.getElementById('canvas-loader');
+            canvasLoader.classList.remove('hidden');
 
-            // Fetch the image as base64 to bypass CORS restrictions
             google.script.run
                 .withSuccessHandler((base64DataUrl) => {
+                    canvasLoader.classList.add('hidden');
                     if (base64DataUrl) {
-                        // Update subtitle once loaded
                         document.getElementById('coord-canvas-subtitle').textContent = `Image ${imageIndex + 1}: ${description}`;
                         loadCoordinateImage(base64DataUrl);
                     } else {
-                        alert('Failed to load image. Please try again.');
                         document.getElementById('coord-canvas-subtitle').textContent = 'Error loading image';
+                        onScriptRunFailure({ message: 'Server failed to load image data.' });
                     }
                 })
-                .withFailureHandler((error) => {
-                    console.error('Error fetching image:', error);
-                    alert('Failed to load image: ' + error.message);
-                    document.getElementById('coord-canvas-subtitle').textContent = 'Error loading image';
+                .withFailureHandler((err) => {
+                    canvasLoader.classList.add('hidden');
+                    onScriptRunFailure(err);
                 })
                 .getImageAsBase64(imageUrl);
         }
 
-        /**
-         * Initializes the coordinate helper tool view
-         */
         function initializeCoordinateHelper() {
-            console.log('initializeCoordinateHelper() called');
+            if (coordHelperState.initialized) return;
 
-            // Check if already initialized to prevent duplicate event listeners
-            if (coordHelperState.initialized) {
-                console.log('Coordinate helper already initialized, skipping...');
-                return;
-            }
-
-            // Hide other views and show coordinate helper
             landingPage.style.display = 'none';
             simulationView.style.display = 'none';
 
             const coordHelperView = document.getElementById('coordinate-helper-view');
             coordHelperView.classList.remove('hidden');
-            coordHelperView.style.display = 'block'; // Explicitly set display to override Tailwind
 
-            console.log('Coordinate helper view should now be visible');
-
-            // Setup canvas context
             const canvas = document.getElementById('coord-canvas');
             coordHelperState.canvas = canvas;
             coordHelperState.ctx = canvas.getContext('2d');
 
-            // Setup navigation button handlers
-            document.getElementById('coord-back-to-lessons').addEventListener('click', () => {
-                document.getElementById('coord-image-selection').classList.add('hidden');
-                document.getElementById('coord-lesson-selection').classList.remove('hidden');
-            });
-
-            document.getElementById('coord-back-to-images').addEventListener('click', () => {
-                document.getElementById('coord-canvas-editor').classList.add('hidden');
-                document.getElementById('coord-image-selection').classList.remove('hidden');
-            });
-
-            document.getElementById('coord-back-to-lessons-from-canvas').addEventListener('click', () => {
-                document.getElementById('coord-canvas-editor').classList.add('hidden');
-                document.getElementById('coord-lesson-selection').classList.remove('hidden');
-            });
-
-            // Setup copy zones array button handler
-            document.getElementById('copy-zones-array').addEventListener('click', () => {
-                const zonesArrayOutput = document.getElementById('json-zones-array');
-                zonesArrayOutput.select();
-                document.execCommand('copy');
-
-                // Visual feedback
-                const copyBtn = document.getElementById('copy-zones-array');
-                const originalText = copyBtn.textContent;
-                copyBtn.textContent = '✓ Copied!';
-                setTimeout(() => {
-                    copyBtn.textContent = originalText;
-                }, 2000);
-            });
-
-            // Setup copy full metadata button handler
-            document.getElementById('copy-full-metadata').addEventListener('click', () => {
-                const fullMetadataOutput = document.getElementById('json-full-metadata');
-                fullMetadataOutput.select();
-                document.execCommand('copy');
-
-                // Visual feedback
-                const copyBtn = document.getElementById('copy-full-metadata');
-                const originalText = copyBtn.textContent;
-                copyBtn.textContent = '✓ Copied!';
-                setTimeout(() => {
-                    copyBtn.textContent = originalText;
-                }, 2000);
-            });
-
-            // Setup clear zones button handler
-            document.getElementById('clear-zones').addEventListener('click', () => {
-                if (confirm('Are you sure you want to clear all zones?')) {
-                    coordHelperState.zones = [];
-                    redrawCanvas();
-                    updateZonesList();
-                    updateJsonOutput();
-                }
-            });
-
-            // Canvas mouse event handlers
             canvas.addEventListener('mousedown', handleCanvasMouseDown);
             canvas.addEventListener('mousemove', handleCanvasMouseMove);
             canvas.addEventListener('mouseup', handleCanvasMouseUp);
-
-            // Mark as initialized
             coordHelperState.initialized = true;
-            console.log('Coordinate helper initialization complete');
 
-            // Load lessons from spreadsheet
-            google.script.run.withSuccessHandler(buildCoordinateHelperLandingPage).getLessons();
+            google.script.run
+                .withSuccessHandler(buildCoordinateHelperLandingPage)
+                .withFailureHandler(onScriptRunFailure)
+                .getLessons();
         }
 
-        /**
-         * Loads an image into the coordinate helper canvas
-         * @param {string} dataUrl Base64-encoded data URL of the image
-         */
         function loadCoordinateImage(dataUrl) {
             const img = new Image();
-
             img.onload = () => {
                 coordHelperState.image = img;
-
-                // Set canvas size to match image aspect ratio
                 const maxWidth = 800;
                 const aspectRatio = img.height / img.width;
                 coordHelperState.canvas.width = Math.min(img.width, maxWidth);
                 coordHelperState.canvas.height = coordHelperState.canvas.width * aspectRatio;
-
-                // Draw image
                 redrawCanvas();
             };
-
-            img.onerror = () => {
-                alert('Failed to load image into canvas.');
-            };
-
+            img.onerror = () => onScriptRunFailure({ message: 'Failed to load image into canvas.'});
             img.src = dataUrl;
         }
 
-        /**
-         * Redraws the canvas with the image and all zones
-         */
         function redrawCanvas() {
             if (!coordHelperState.image) return;
-
             const { ctx, canvas, image, zones, currentZone } = coordHelperState;
-
-            // Clear canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Draw image
             ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-
-            // Draw all saved zones
-            zones.forEach((zone, index) => {
-                drawZone(zone, index, false);
-            });
-
-            // Draw current zone being drawn
-            if (currentZone) {
-                drawZone(currentZone, zones.length, true);
-            }
+            zones.forEach((zone, index) => drawZone(zone, index, false));
+            if (currentZone) drawZone(currentZone, zones.length, true);
         }
 
-        /**
-         * Draws a single zone rectangle on the canvas
-         */
         function drawZone(zone, index, isTemporary) {
             const { ctx, canvas } = coordHelperState;
-
-            // Convert percentages to pixels
             const x = (zone.x / 100) * canvas.width;
             const y = (zone.y / 100) * canvas.height;
             const width = (zone.width / 100) * canvas.width;
             const height = (zone.height / 100) * canvas.height;
-
-            // Draw rectangle
             ctx.strokeStyle = isTemporary ? '#fbbf24' : '#3b82f6';
             ctx.lineWidth = 2;
             ctx.strokeRect(x, y, width, height);
-
-            // Draw semi-transparent fill
             ctx.fillStyle = isTemporary ? 'rgba(251, 191, 36, 0.2)' : 'rgba(59, 130, 246, 0.2)';
             ctx.fillRect(x, y, width, height);
-
-            // Draw label
             if (zone.label) {
                 ctx.fillStyle = '#000';
                 ctx.font = 'bold 14px Inter, sans-serif';
@@ -1297,46 +1459,30 @@
             }
         }
 
-        /**
-         * Handles mouse down event on canvas
-         */
         function handleCanvasMouseDown(e) {
             if (!coordHelperState.image) return;
-
             const rect = coordHelperState.canvas.getBoundingClientRect();
-
-            // Scale mouse coordinates to match canvas internal dimensions
             const scaleX = coordHelperState.canvas.width / rect.width;
             const scaleY = coordHelperState.canvas.height / rect.height;
             const x = (e.clientX - rect.left) * scaleX;
             const y = (e.clientY - rect.top) * scaleY;
-
             coordHelperState.isDrawing = true;
             coordHelperState.startX = x;
             coordHelperState.startY = y;
             coordHelperState.currentZone = null;
         }
 
-        /**
-         * Handles mouse move event on canvas
-         */
         function handleCanvasMouseMove(e) {
             if (!coordHelperState.isDrawing || !coordHelperState.image) return;
-
             const rect = coordHelperState.canvas.getBoundingClientRect();
-
-            // Scale mouse coordinates to match canvas internal dimensions
             const scaleX = coordHelperState.canvas.width / rect.width;
             const scaleY = coordHelperState.canvas.height / rect.height;
             const currentX = (e.clientX - rect.left) * scaleX;
             const currentY = (e.clientY - rect.top) * scaleY;
-
-            // Calculate zone in percentages
             const x = Math.min(coordHelperState.startX, currentX);
             const y = Math.min(coordHelperState.startY, currentY);
             const width = Math.abs(currentX - coordHelperState.startX);
             const height = Math.abs(currentY - coordHelperState.startY);
-
             coordHelperState.currentZone = {
                 x: (x / coordHelperState.canvas.width) * 100,
                 y: (y / coordHelperState.canvas.height) * 100,
@@ -1344,92 +1490,110 @@
                 height: (height / coordHelperState.canvas.height) * 100,
                 label: ''
             };
-
             redrawCanvas();
         }
 
-        /**
-         * Handles mouse up event on canvas
-         */
         function handleCanvasMouseUp(e) {
             if (!coordHelperState.isDrawing || !coordHelperState.image) return;
-
             coordHelperState.isDrawing = false;
 
-            // Only save zones with meaningful size
-            if (coordHelperState.currentZone &&
-                coordHelperState.currentZone.width > 1 &&
-                coordHelperState.currentZone.height > 1) {
+            if (coordHelperState.currentZone && coordHelperState.currentZone.width > 1 && coordHelperState.currentZone.height > 1) {
+                // First ask for label
+                showCustomModal({
+                    title: 'Enter Zone Label',
+                    message: 'Please provide an optional label for this zone.',
+                    type: 'prompt',
+                    placeholder: 'e.g., Nucleus'
+                }).then(function(label) {
+                    if(label !== null) { // Only proceed if user didn't cancel
+                        coordHelperState.currentZone.label = label;
 
-                // Prompt for label
-                const label = prompt('Enter a label for this zone (optional):') || '';
-                coordHelperState.currentZone.label = label;
+                        // Then ask for target image
+                        const imageOptions = [
+                            { value: '', label: 'None (Sequential navigation)' },
+                            ...coordHelperState.lessonImages.map(img => ({
+                                value: img.index.toString(),
+                                label: `Image ${img.index + 1}: ${img.description}`
+                            }))
+                        ];
 
-                // Round to 2 decimal places
-                coordHelperState.currentZone.x = Math.round(coordHelperState.currentZone.x * 100) / 100;
-                coordHelperState.currentZone.y = Math.round(coordHelperState.currentZone.y * 100) / 100;
-                coordHelperState.currentZone.width = Math.round(coordHelperState.currentZone.width * 100) / 100;
-                coordHelperState.currentZone.height = Math.round(coordHelperState.currentZone.height * 100) / 100;
+                        showCustomModal({
+                            title: 'Select Target Image',
+                            message: 'Which image should this zone navigate to?',
+                            type: 'select',
+                            options: imageOptions
+                        }).then(function(targetView) {
+                            if (targetView !== null) {
+                                // Add targetView only if a specific image was selected
+                                if (targetView !== '') {
+                                    coordHelperState.currentZone.targetView = parseInt(targetView);
+                                }
 
-                coordHelperState.zones.push(coordHelperState.currentZone);
-                updateZonesList();
-                updateJsonOutput();
+                                coordHelperState.currentZone.x = Math.round(coordHelperState.currentZone.x * 100) / 100;
+                                coordHelperState.currentZone.y = Math.round(coordHelperState.currentZone.y * 100) / 100;
+                                coordHelperState.currentZone.width = Math.round(coordHelperState.currentZone.width * 100) / 100;
+                                coordHelperState.currentZone.height = Math.round(coordHelperState.currentZone.height * 100) / 100;
+                                coordHelperState.zones.push(coordHelperState.currentZone);
+                                updateZonesList();
+                                updateJsonOutput();
+                            }
+                            coordHelperState.currentZone = null;
+                            redrawCanvas();
+                        });
+                    } else {
+                        coordHelperState.currentZone = null;
+                        redrawCanvas();
+                    }
+                });
+            } else {
+                coordHelperState.currentZone = null;
+                redrawCanvas();
             }
-
-            coordHelperState.currentZone = null;
-            redrawCanvas();
         }
 
-        /**
-         * Updates the zones list display
-         */
         function updateZonesList() {
             const zonesList = document.getElementById('zones-list');
-
             if (coordHelperState.zones.length === 0) {
                 zonesList.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">No zones defined yet. Click and drag on the image to create zones.</p>';
                 return;
             }
-
-            zonesList.innerHTML = coordHelperState.zones.map((zone, index) => `
+            zonesList.innerHTML = coordHelperState.zones.map((zone, index) => {
+                let targetInfo = '';
+                if (zone.targetView !== undefined && zone.targetView !== null) {
+                    const targetImage = coordHelperState.lessonImages.find(img => img.index === zone.targetView);
+                    targetInfo = targetImage
+                        ? `<br>→ Target: Image ${zone.targetView + 1} (${targetImage.description})`
+                        : `<br>→ Target: Image ${zone.targetView + 1}`;
+                }
+                return `
                 <div class="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg flex justify-between items-start">
                     <div class="flex-1">
                         <div class="font-semibold text-sm">${zone.label || `Zone ${index + 1}`}</div>
                         <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">
                             x: ${zone.x}%, y: ${zone.y}%<br>
-                            w: ${zone.width}%, h: ${zone.height}%
+                            w: ${zone.width}%, h: ${zone.height}%${targetInfo}
                         </div>
                     </div>
                     <button onclick="deleteZone(${index})" class="ml-2 px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">
                         Delete
                     </button>
                 </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
-        /**
-         * Deletes a zone by index
-         */
         function deleteZone(index) {
             coordHelperState.zones.splice(index, 1);
             updateZonesList();
             updateJsonOutput();
             redrawCanvas();
         }
-        // Expose to global scope for inline onclick handlers
         window.deleteZone = deleteZone;
 
-        /**
-         * Updates the JSON output textareas
-         */
         function updateJsonOutput() {
             const zonesArrayOutput = document.getElementById('json-zones-array');
             const fullMetadataOutput = document.getElementById('json-full-metadata');
-
-            // Always output the zones array (this is what goes in the spreadsheet)
             zonesArrayOutput.value = JSON.stringify(coordHelperState.zones, null, 2);
-
-            // If we have lesson context, include it in the full metadata
             if (coordHelperState.currentLesson !== null) {
                 const outputWithMetadata = {
                     lessonName: coordHelperState.currentLesson,
@@ -1439,11 +1603,10 @@
                 };
                 fullMetadataOutput.value = JSON.stringify(outputWithMetadata, null, 2);
             } else {
-                // Fallback to just zones array if no context
                 fullMetadataOutput.value = JSON.stringify({ zones: coordHelperState.zones }, null, 2);
             }
         }
-
+        
         // ==============================
         // ADMIN LESSON MANAGEMENT
         // ==============================
@@ -1461,7 +1624,8 @@
             startX: 0,
             startY: 0,
             currentZone: null,
-            folderId: null
+            folderId: null,
+            lessonImages: [] // Store all images in the lesson for target selection
         };
 
         /**
@@ -1489,15 +1653,19 @@
             const username = document.getElementById('admin-username').value;
             const password = document.getElementById('admin-password').value;
             const errorDiv = document.getElementById('admin-login-error');
+            const loginBtn = document.getElementById('admin-login-btn');
 
             if (!username || !password) {
                 errorDiv.textContent = 'Please enter both username and password.';
                 errorDiv.classList.remove('hidden');
                 return;
             }
+            
+            showButtonLoader(loginBtn, 'Logging In...');
 
             google.script.run
                 .withSuccessHandler((result) => {
+                    hideButtonLoader(loginBtn);
                     if (result.success) {
                         hideAdminLogin();
                         showAdminLessonList();
@@ -1506,9 +1674,9 @@
                         errorDiv.classList.remove('hidden');
                     }
                 })
-                .withFailureHandler((error) => {
-                    errorDiv.textContent = 'Login failed: ' + error.message;
-                    errorDiv.classList.remove('hidden');
+                .withFailureHandler((err) => {
+                    hideButtonLoader(loginBtn);
+                    onScriptRunFailure(err);
                 })
                 .authenticateAdmin(username, password);
         }
@@ -1542,15 +1710,17 @@
 
             loader.classList.remove('hidden');
             container.innerHTML = '';
+            showSkeletonLoader(container, 3, 'lesson');
 
             google.script.run
                 .withSuccessHandler((lessons) => {
                     loader.classList.add('hidden');
                     buildAdminLessonCards(lessons);
                 })
-                .withFailureHandler((error) => {
-                    loader.classList.add('hidden');
-                    container.innerHTML = `<p class="text-red-500 col-span-full text-center">Error loading lessons: ${error.message}</p>`;
+                .withFailureHandler((err) => {
+                     loader.classList.add('hidden');
+                     container.innerHTML = '';
+                     onScriptRunFailure(err);
                 })
                 .getLessons();
         }
@@ -1575,7 +1745,7 @@
                     <div class="p-6">
                         <h3 class="font-bold text-lg">${lesson.name}</h3>
                         <p class="text-gray-600 dark:text-gray-400 text-sm mt-1">${lesson.description || 'No description'}</p>
-                        <button onclick="editLesson('${lesson.name.replace(/'/g, "&#39;")}')" class="mt-4 w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded hover:bg-blue-700 transition-all">
+                        <button onclick="editLesson(this, '${lesson.name.replace(/'/g, "&#39;")}')" class="mt-4 w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded hover:bg-blue-700 transition-all">
                             Edit Lesson
                         </button>
                     </div>
@@ -1599,7 +1769,8 @@
         /**
          * Edits an existing lesson
          */
-        function editLesson(lessonName) {
+        function editLesson(button, lessonName) {
+            showButtonLoader(button, 'Loading...');
             adminState.currentLessonTitle = lessonName;
             showImageManager(lessonName);
         }
@@ -1612,24 +1783,29 @@
         function saveLesson() {
             const title = document.getElementById('lesson-title-input').value.trim();
             const description = document.getElementById('lesson-description-input').value.trim();
+            const saveBtn = document.getElementById('admin-save-lesson-btn');
 
             if (!title) {
-                alert('Please enter a lesson title.');
+                showCustomModal({ title: 'Input Required', message: 'Please enter a lesson title.', type: 'confirm'});
                 return;
             }
+            
+            showButtonLoader(saveBtn, 'Saving...');
 
             google.script.run
                 .withSuccessHandler((result) => {
+                    hideButtonLoader(saveBtn);
                     if (result.success) {
                         adminState.currentLessonTitle = title;
                         adminState.folderId = result.folderId;
                         showImageManager(title);
                     } else {
-                        alert('Error creating lesson: ' + result.message);
+                        showCustomModal({ title: 'Error', message: 'Error creating lesson: ' + result.message, type: 'confirm'});
                     }
                 })
-                .withFailureHandler((error) => {
-                    alert('Error creating lesson: ' + error.message);
+                .withFailureHandler((err) => {
+                    hideButtonLoader(saveBtn);
+                    onScriptRunFailure(err);
                 })
                 .createLesson(title, description);
         }
@@ -1643,12 +1819,14 @@
             document.getElementById('admin-image-manager').classList.remove('hidden');
             document.getElementById('admin-zone-editor').classList.add('hidden');
 
-            document.getElementById('admin-image-manager-title').textContent = 'Manage Images: ' + lessonName;
+            document.getElementById('admin-image-manager-title').textContent = 'Manage Images for: ' + lessonName;
             document.getElementById('admin-image-manager-subtitle').textContent = lessonName;
 
             // Clear image preview
             document.getElementById('image-preview-section').classList.add('hidden');
             adminState.currentImageData = null;
+            document.getElementById('image-description-input').value = '';
+
 
             // Load existing images for this lesson
             loadExistingImages(lessonName);
@@ -1658,15 +1836,19 @@
          * Loads existing images for a lesson
          */
         function loadExistingImages(lessonName) {
+            showSkeletonLoader(document.getElementById('existing-images-list'), 2, 'image');
             google.script.run
                 .withSuccessHandler((result) => {
                     if (result.success) {
                         displayExistingImages(result.data.images);
                         adminState.currentImageIndex = result.data.images.length;
+                    } else {
+                        document.getElementById('existing-images-list').innerHTML = `<p class="text-red-500">${result.message}</p>`;
                     }
                 })
-                .withFailureHandler((error) => {
-                    console.error('Error loading existing images:', error);
+                .withFailureHandler((err) => {
+                    document.getElementById('existing-images-list').innerHTML = '';
+                    onScriptRunFailure(err)
                 })
                 .getLessonForEditing(lessonName);
         }
@@ -1677,6 +1859,9 @@
         function displayExistingImages(images) {
             const container = document.getElementById('existing-images-list');
             container.innerHTML = '';
+
+            // Store images for target selection in zones
+            adminState.lessonImages = images;
 
             if (images.length === 0) {
                 container.innerHTML = '<p class="text-gray-500 col-span-full">No images yet. Upload your first image!</p>';
@@ -1690,45 +1875,13 @@
                     <img src="${image.url}" class="w-full h-32 object-cover rounded mb-2" alt="${image.description}">
                     <p class="text-sm font-semibold">Image ${idx + 1}</p>
                     <p class="text-xs text-gray-600 dark:text-gray-400">${image.description}</p>
-                    <button onclick="editImageZones(${idx})" class="mt-2 w-full px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
+                    <button onclick="editImageZones(this, ${idx})" class="mt-2 w-full px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
                         Edit Zones
                     </button>
                 `;
                 container.appendChild(imageCard);
             });
         }
-
-        /**
-         * Handles file input for image upload
-         */
-        document.addEventListener('DOMContentLoaded', () => {
-            const fileInput = document.getElementById('image-file-input');
-            const uploadBtn = document.getElementById('upload-image-btn');
-            const pasteArea = document.getElementById('paste-area');
-
-            uploadBtn.addEventListener('click', () => {
-                fileInput.click();
-            });
-
-            fileInput.addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    handleImageFile(file);
-                }
-            });
-
-            // Handle paste events
-            pasteArea.addEventListener('paste', (e) => {
-                const items = e.clipboardData.items;
-                for (let i = 0; i < items.length; i++) {
-                    if (items[i].type.indexOf('image') !== -1) {
-                        const blob = items[i].getAsFile();
-                        handleImageFile(blob);
-                        break;
-                    }
-                }
-            });
-        });
 
         /**
          * Handles image file (from upload or paste)
@@ -1757,15 +1910,18 @@
          */
         function saveAndDefineZones() {
             const description = document.getElementById('image-description-input').value.trim();
+            const saveBtn = document.getElementById('save-and-define-zones-btn');
             if (!description) {
-                alert('Please enter an image description.');
+                showCustomModal({ title: 'Input Required', message: 'Please enter an image description.', type: 'confirm'});
                 return;
             }
 
             if (!adminState.currentImageData) {
-                alert('No image selected.');
+                showCustomModal({ title: 'Error', message: 'No image selected.', type: 'confirm'});
                 return;
             }
+
+            showButtonLoader(saveBtn, 'Uploading...');
 
             // Upload image to Drive first
             const base64Data = adminState.currentImageData.split(',')[1];
@@ -1781,6 +1937,7 @@
                         // Upload the image
                         google.script.run
                             .withSuccessHandler((uploadResult) => {
+                                hideButtonLoader(saveBtn);
                                 if (uploadResult.success) {
                                     adminState.currentImage = {
                                         description: description,
@@ -1789,19 +1946,22 @@
                                     };
                                     showZoneEditor();
                                 } else {
-                                    alert('Error uploading image: ' + uploadResult.message);
+                                     showCustomModal({ title: 'Error', message: 'Error uploading image: ' + uploadResult.message, type: 'confirm'});
                                 }
                             })
-                            .withFailureHandler((error) => {
-                                alert('Error uploading image: ' + error.message);
+                            .withFailureHandler((err) => {
+                                hideButtonLoader(saveBtn);
+                                onScriptRunFailure(err);
                             })
                             .uploadImageToDrive(base64Data, mimeType, fileName, adminState.folderId);
                     } else {
-                        alert('Error getting folder: ' + folderResult.message);
+                        hideButtonLoader(saveBtn);
+                        showCustomModal({ title: 'Error', message: 'Error getting folder: ' + folderResult.message, type: 'confirm'});
                     }
                 })
-                .withFailureHandler((error) => {
-                    alert('Error: ' + error.message);
+                .withFailureHandler((err) => {
+                    hideButtonLoader(saveBtn);
+                    onScriptRunFailure(err);
                 })
                 .createLessonFolder(adminState.currentLessonTitle);
         }
@@ -1820,7 +1980,6 @@
             // Initialize canvas
             adminState.canvas = document.getElementById('admin-canvas');
             adminState.ctx = adminState.canvas.getContext('2d');
-            adminState.zones = [];
 
             // Setup canvas event listeners
             adminState.canvas.addEventListener('mousedown', handleAdminCanvasMouseDown);
@@ -1845,9 +2004,7 @@
                 adminState.canvas.height = adminState.canvas.width * aspectRatio;
                 redrawAdminCanvas();
             };
-            img.onerror = () => {
-                alert('Failed to load image.');
-            };
+            img.onerror = () => showCustomModal({ title: 'Error', message: 'Failed to load image.', type: 'confirm'});
             img.src = dataUrl;
         }
 
@@ -1954,20 +2111,56 @@
                 adminState.currentZone.width > 1 &&
                 adminState.currentZone.height > 1) {
 
-                const label = prompt('Enter a label for this zone (optional):') || '';
-                adminState.currentZone.label = label;
+                // First ask for label
+                showCustomModal({
+                    title: 'Enter Zone Label',
+                    message: 'Enter a label for this zone (optional):',
+                    type: 'prompt'
+                }).then(function(label) {
+                    if (label !== null) {
+                        adminState.currentZone.label = label;
 
-                adminState.currentZone.x = Math.round(adminState.currentZone.x * 100) / 100;
-                adminState.currentZone.y = Math.round(adminState.currentZone.y * 100) / 100;
-                adminState.currentZone.width = Math.round(adminState.currentZone.width * 100) / 100;
-                adminState.currentZone.height = Math.round(adminState.currentZone.height * 100) / 100;
+                        // Then ask for target image
+                        const imageOptions = [
+                            { value: '', label: 'None (Sequential navigation)' },
+                            ...adminState.lessonImages.map(img => ({
+                                value: img.index.toString(),
+                                label: `Image ${img.index + 1}: ${img.description}`
+                            }))
+                        ];
 
-                adminState.zones.push(adminState.currentZone);
-                updateAdminZonesList();
+                        showCustomModal({
+                            title: 'Select Target Image',
+                            message: 'Which image should this zone navigate to?',
+                            type: 'select',
+                            options: imageOptions
+                        }).then(function(targetView) {
+                            if (targetView !== null) {
+                                // Add targetView only if a specific image was selected
+                                if (targetView !== '') {
+                                    adminState.currentZone.targetView = parseInt(targetView);
+                                }
+
+                                adminState.currentZone.x = Math.round(adminState.currentZone.x * 100) / 100;
+                                adminState.currentZone.y = Math.round(adminState.currentZone.y * 100) / 100;
+                                adminState.currentZone.width = Math.round(adminState.currentZone.width * 100) / 100;
+                                adminState.currentZone.height = Math.round(adminState.currentZone.height * 100) / 100;
+
+                                adminState.zones.push(adminState.currentZone);
+                                updateAdminZonesList();
+                            }
+                            adminState.currentZone = null;
+                            redrawAdminCanvas();
+                        });
+                    } else {
+                        adminState.currentZone = null;
+                        redrawAdminCanvas();
+                    }
+                });
+            } else {
+                adminState.currentZone = null;
+                redrawAdminCanvas();
             }
-
-            adminState.currentZone = null;
-            redrawAdminCanvas();
         }
 
         /**
@@ -1981,20 +2174,29 @@
                 return;
             }
 
-            zonesList.innerHTML = adminState.zones.map((zone, index) => `
+            zonesList.innerHTML = adminState.zones.map((zone, index) => {
+                let targetInfo = '';
+                if (zone.targetView !== undefined && zone.targetView !== null) {
+                    const targetImage = adminState.lessonImages.find(img => img.index === zone.targetView);
+                    targetInfo = targetImage
+                        ? `<br>→ Target: Image ${zone.targetView + 1} (${targetImage.description})`
+                        : `<br>→ Target: Image ${zone.targetView + 1}`;
+                }
+                return `
                 <div class="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg flex justify-between items-start">
                     <div class="flex-1">
                         <div class="font-semibold text-sm">${zone.label || `Zone ${index + 1}`}</div>
                         <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">
                             x: ${zone.x}%, y: ${zone.y}%<br>
-                            w: ${zone.width}%, h: ${zone.height}%
+                            w: ${zone.width}%, h: ${zone.height}%${targetInfo}
                         </div>
                     </div>
                     <button onclick="deleteAdminZone(${index})" class="ml-2 px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">
                         Delete
                     </button>
                 </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
         /**
@@ -2013,19 +2215,23 @@
          */
         function saveAdminZones() {
             const zonesJson = JSON.stringify(adminState.zones);
+            const saveBtn = document.getElementById('admin-save-zones-btn');
+            showButtonLoader(saveBtn, 'Saving...');
 
             google.script.run
                 .withSuccessHandler((result) => {
+                    hideButtonLoader(saveBtn);
                     if (result.success) {
-                        alert('Zones saved successfully!');
+                         showCustomModal({ title: 'Success', message: 'Zones saved successfully!', type: 'confirm'});
                         adminState.currentImageIndex++;
                         showImageManager(adminState.currentLessonTitle);
                     } else {
-                        alert('Error saving zones: ' + result.message);
+                        showCustomModal({ title: 'Error', message: 'Error saving zones: ' + result.message, type: 'confirm'});
                     }
                 })
-                .withFailureHandler((error) => {
-                    alert('Error saving zones: ' + error.message);
+                .withFailureHandler((err) => {
+                    hideButtonLoader(saveBtn);
+                    onScriptRunFailure(err);
                 })
                 .updateLessonImage(
                     adminState.currentLessonTitle,
@@ -2039,7 +2245,8 @@
         /**
          * Edits zones for an existing image
          */
-        function editImageZones(imageIndex) {
+        function editImageZones(button, imageIndex) {
+            showButtonLoader(button, 'Loading...');
             // Load the image data and show zone editor
             google.script.run
                 .withSuccessHandler((result) => {
@@ -2056,55 +2263,148 @@
                         }
 
                         // Fetch the image as base64 and show zone editor
+                        const adminCanvasLoader = document.getElementById('admin-canvas-loader');
+                        adminCanvasLoader.classList.remove('hidden');
                         google.script.run
                             .withSuccessHandler((base64DataUrl) => {
+                                adminCanvasLoader.classList.add('hidden');
                                 if (base64DataUrl) {
                                     adminState.currentImageData = base64DataUrl;
                                     showZoneEditor();
                                 }
                             })
+                            .withFailureHandler((err) => {
+                                hideButtonLoader(button);
+                                adminCanvasLoader.classList.add('hidden');
+                                onScriptRunFailure(err);
+                            })
                             .getImageAsBase64(image.url);
+                    } else {
+                        hideButtonLoader(button);
                     }
                 })
+                 .withFailureHandler((err) => {
+                    hideButtonLoader(button);
+                    onScriptRunFailure(err);
+                 })
                 .getLessonForEditing(adminState.currentLessonTitle);
         }
         // Expose to global scope for inline onclick handlers
         window.editImageZones = editImageZones;
 
-        // Event listeners for admin buttons
+        // Event listeners for all buttons
         document.addEventListener('DOMContentLoaded', () => {
             try {
+                // Modal buttons
+                document.getElementById('modal-confirm-btn')?.addEventListener('click', handleModalConfirm);
+                document.getElementById('modal-cancel-btn')?.addEventListener('click', handleModalCancel);
+
+                // Main page buttons
                 document.getElementById('lesson-setup-button')?.addEventListener('click', showAdminLogin);
+                
+                // Admin login
                 document.getElementById('admin-login-btn')?.addEventListener('click', handleAdminLogin);
                 document.getElementById('admin-login-cancel')?.addEventListener('click', hideAdminLogin);
+                document.getElementById('admin-password')?.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') handleAdminLogin();
+                });
+
+                // Admin lesson list
                 document.getElementById('admin-create-lesson-btn')?.addEventListener('click', showCreateLessonForm);
-                document.getElementById('admin-save-lesson-btn')?.addEventListener('click', saveLesson);
-                document.getElementById('admin-cancel-lesson-btn')?.addEventListener('click', showAdminLessonList);
-                document.getElementById('admin-back-to-main')?.addEventListener('click', () => {
+                document.getElementById('admin-back-to-main')?.addEventListener('click', (e) => {
+                    const btn = e.target.closest('button');
+                    showButtonLoader(btn, 'Loading...');
                     document.getElementById('admin-view').classList.add('hidden');
                     landingPage.style.display = 'block';
+                    google.script.run
+                        .withSuccessHandler((lessons) => {
+                            hideButtonLoader(btn);
+                            buildLandingPage(lessons);
+                        })
+                        .withFailureHandler((err) => {
+                            hideButtonLoader(btn);
+                            onScriptRunFailure(err);
+                        })
+                        .getLessons();
+                });
+
+                // Admin lesson form
+                document.getElementById('admin-save-lesson-btn')?.addEventListener('click', saveLesson);
+                document.getElementById('admin-cancel-lesson-btn')?.addEventListener('click', showAdminLessonList);
+
+                // Admin image manager
+                document.getElementById('upload-image-btn')?.addEventListener('click', () => document.getElementById('image-file-input').click());
+                document.getElementById('image-file-input')?.addEventListener('change', (e) => {
+                    if (e.target.files[0]) handleImageFile(e.target.files[0]);
+                });
+                document.getElementById('paste-area')?.addEventListener('paste', (e) => {
+                    const items = e.clipboardData.items;
+                    for (let i = 0; i < items.length; i++) {
+                        if (items[i].type.indexOf('image') !== -1) {
+                            handleImageFile(items[i].getAsFile());
+                            break;
+                        }
+                    }
                 });
                 document.getElementById('admin-back-to-lesson-list')?.addEventListener('click', showAdminLessonList);
                 document.getElementById('clear-image-btn')?.addEventListener('click', clearImage);
                 document.getElementById('save-and-define-zones-btn')?.addEventListener('click', saveAndDefineZones);
-                document.getElementById('admin-clear-zones')?.addEventListener('click', () => {
-                    if (confirm('Clear all zones?')) {
-                        adminState.zones = [];
-                        updateAdminZonesList();
-                        redrawAdminCanvas();
-                    }
+
+                // Admin zone editor
+                document.getElementById('admin-clear-zones')?.addEventListener('click', function() {
+                    showCustomModal({ title: 'Confirm', message: 'Are you sure you want to clear all zones?', type: 'confirm'}).then(function(confirmed) {
+                        if (confirmed) {
+                            adminState.zones = [];
+                            updateAdminZonesList();
+                            redrawAdminCanvas();
+                        }
+                    });
                 });
                 document.getElementById('admin-save-zones-btn')?.addEventListener('click', saveAdminZones);
                 document.getElementById('admin-back-to-images')?.addEventListener('click', () => {
                     showImageManager(adminState.currentLessonTitle);
                 });
 
-                // Handle Enter key in login form
-                document.getElementById('admin-password')?.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') {
-                        handleAdminLogin();
-                    }
+                // Coordinate Helper buttons
+                document.getElementById('coord-back-to-lessons')?.addEventListener('click', () => {
+                    document.getElementById('coord-image-selection').classList.add('hidden');
+                    document.getElementById('coord-lesson-selection').classList.remove('hidden');
                 });
+                document.getElementById('coord-back-to-images')?.addEventListener('click', () => {
+                    document.getElementById('coord-canvas-editor').classList.add('hidden');
+                    document.getElementById('coord-image-selection').classList.remove('hidden');
+                });
+                document.getElementById('coord-back-to-lessons-from-canvas')?.addEventListener('click', () => {
+                    document.getElementById('coord-canvas-editor').classList.add('hidden');
+                    document.getElementById('coord-lesson-selection').classList.remove('hidden');
+                });
+                document.getElementById('copy-zones-array').addEventListener('click', (e) => {
+                    const btn = e.target;
+                    const originalText = btn.textContent;
+                    document.getElementById('json-zones-array').select();
+                    document.execCommand('copy');
+                    btn.textContent = '✓ Copied!';
+                    setTimeout(() => { btn.textContent = originalText; }, 2000);
+                });
+                document.getElementById('copy-full-metadata').addEventListener('click', (e) => {
+                     const btn = e.target;
+                    const originalText = btn.textContent;
+                    document.getElementById('json-full-metadata').select();
+                    document.execCommand('copy');
+                    btn.textContent = '✓ Copied!';
+                    setTimeout(() => { btn.textContent = originalText; }, 2000);
+                });
+                document.getElementById('clear-zones').addEventListener('click', function() {
+                    showCustomModal({ title: 'Confirm Clear', message: 'Are you sure you want to clear all zones?', type: 'confirm'}).then(function(confirmed) {
+                        if(confirmed) {
+                            coordHelperState.zones = [];
+                            redrawCanvas();
+                            updateZonesList();
+                            updateJsonOutput();
+                        }
+                    });
+                });
+
             } catch (error) {
                 console.error('Error setting up event listeners:', error);
             }

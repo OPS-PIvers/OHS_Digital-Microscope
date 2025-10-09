@@ -349,8 +349,8 @@ function authenticateAdmin(username, password) {
     for (let i = 0; i < credentials.length; i++) {
       const [storedUsername, storedPassword] = credentials[i];
       if (storedUsername && storedPassword &&
-          storedUsername.toString().trim() === username.trim() &&
-          storedPassword.toString().trim() === password.trim()) {
+        storedUsername.toString().trim() === username.trim() &&
+        storedPassword.toString().trim() === password.trim()) {
         return { success: true, message: "Authentication successful." };
       }
     }
@@ -655,4 +655,3 @@ function getLessonForEditing(lessonName) {
     };
   }
 }
-
