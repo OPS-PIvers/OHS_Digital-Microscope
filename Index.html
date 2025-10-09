@@ -462,7 +462,7 @@
 
                 <div class="mb-6">
                     <div class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center bg-gray-50 dark:bg-gray-700">
-                        <input type="file" id="image-file-input" accept="image/*" class="hidden">
+                        <input type="file" id="image-file-input" accept="image/*" multiple class="hidden">
                         <button id="upload-image-btn" class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-all">
                             📁 Upload Image from Computer
                         </button>
@@ -1505,7 +1505,14 @@
                     placeholder: 'e.g., Nucleus'
                 }).then(function(label) {
                     if(label !== null) { // Only proceed if user didn't cancel
-                        coordHelperState.currentZone.label = label;
+                        // Trim and validate label
+                        const trimmedLabel = label.trim();
+                        console.log('Zone label entered:', label, '| Trimmed:', trimmedLabel);
+
+                        // Only set label if non-empty, otherwise leave undefined for default fallback
+                        if (trimmedLabel !== '') {
+                            coordHelperState.currentZone.label = trimmedLabel;
+                        }
 
                         // Then ask for target image
                         const imageOptions = [
@@ -1532,7 +1539,11 @@
                                 coordHelperState.currentZone.y = Math.round(coordHelperState.currentZone.y * 100) / 100;
                                 coordHelperState.currentZone.width = Math.round(coordHelperState.currentZone.width * 100) / 100;
                                 coordHelperState.currentZone.height = Math.round(coordHelperState.currentZone.height * 100) / 100;
+
+                                console.log('Adding zone to array:', coordHelperState.currentZone);
                                 coordHelperState.zones.push(coordHelperState.currentZone);
+                                console.log('Total zones:', coordHelperState.zones.length, '| All zones:', coordHelperState.zones);
+
                                 updateZonesList();
                                 updateJsonOutput();
                             }
@@ -1573,13 +1584,49 @@
                             w: ${zone.width}%, h: ${zone.height}%${targetInfo}
                         </div>
                     </div>
-                    <button onclick="deleteZone(${index})" class="ml-2 px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">
-                        Delete
-                    </button>
+                    <div class="flex gap-1 ml-2">
+                        <button onclick="editZone(${index})" class="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">
+                            Edit
+                        </button>
+                        <button onclick="deleteZone(${index})" class="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">
+                            Delete
+                        </button>
+                    </div>
                 </div>
                 `;
             }).join('');
         }
+
+        function editZone(index) {
+            const zone = coordHelperState.zones[index];
+            if (!zone) return;
+
+            // Show modal to edit label
+            showCustomModal({
+                title: 'Edit Zone Label',
+                message: 'Enter a new label for this zone (leave empty for default):',
+                type: 'prompt',
+                placeholder: zone.label || `Zone ${index + 1}`
+            }).then(function(newLabel) {
+                if (newLabel !== null) {
+                    const trimmedLabel = newLabel.trim();
+
+                    // Update the zone
+                    if (trimmedLabel !== '') {
+                        coordHelperState.zones[index].label = trimmedLabel;
+                    } else {
+                        // Remove label property to use default
+                        delete coordHelperState.zones[index].label;
+                    }
+
+                    console.log('Zone edited:', coordHelperState.zones[index]);
+                    updateZonesList();
+                    updateJsonOutput();
+                    redrawCanvas();
+                }
+            });
+        }
+        window.editZone = editZone;
 
         function deleteZone(index) {
             coordHelperState.zones.splice(index, 1);
@@ -1953,6 +2000,176 @@
         }
 
         /**
+         * Handles multiple image files and uploads them sequentially
+         */
+        async function handleMultipleImageFiles(files) {
+            const fileArray = Array.from(files);
+
+            if (fileArray.length === 0) return;
+
+            // If only one file, use the standard single file flow
+            if (fileArray.length === 1) {
+                handleImageFile(fileArray[0]);
+                return;
+            }
+
+            // Ask user for base description
+            const confirmed = await showCustomModal({
+                title: 'Upload Multiple Images',
+                message: `You've selected ${fileArray.length} images. They will be uploaded with auto-generated descriptions (Image 1, Image 2, etc.). You can edit descriptions and add zones after upload. Continue?`,
+                type: 'confirm'
+            });
+
+            if (!confirmed) return;
+
+            // Get folder ID for this lesson first
+            const folderResult = await new Promise((resolve) => {
+                google.script.run
+                    .withSuccessHandler(resolve)
+                    .withFailureHandler((err) => {
+                        onScriptRunFailure(err);
+                        resolve({ success: false });
+                    })
+                    .getLessonFolderId(adminState.currentLessonTitle);
+            });
+
+            if (!folderResult.success) {
+                // Try to create the folder
+                const createResult = await new Promise((resolve) => {
+                    google.script.run
+                        .withSuccessHandler(resolve)
+                        .withFailureHandler((err) => {
+                            onScriptRunFailure(err);
+                            resolve({ success: false });
+                        })
+                        .createLessonFolder(adminState.currentLessonTitle);
+                });
+
+                if (!createResult.success) {
+                    showCustomModal({ title: 'Error', message: 'Failed to get or create lesson folder.', type: 'confirm' });
+                    return;
+                }
+                adminState.folderId = createResult.folderId;
+            } else {
+                adminState.folderId = folderResult.folderId;
+            }
+
+            // Hide the upload section and show a progress indicator
+            const uploadSection = document.querySelector('#image-file-input').closest('.mb-6');
+            const originalHTML = uploadSection.innerHTML;
+
+            let successCount = 0;
+            let failCount = 0;
+
+            // Process each file sequentially
+            for (let i = 0; i < fileArray.length; i++) {
+                const file = fileArray[i];
+                const currentIndex = adminState.currentImageIndex + i;
+                const description = `Image ${currentIndex + 1}`;
+
+                // Update progress
+                uploadSection.innerHTML = `
+                    <div class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center bg-gray-50 dark:bg-gray-700">
+                        <div class="text-lg font-semibold mb-2">Uploading images...</div>
+                        <div class="text-sm text-gray-600 dark:text-gray-400">
+                            Processing ${i + 1} of ${fileArray.length}: ${file.name}
+                        </div>
+                        <div class="mt-4 w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                            <div class="bg-blue-600 h-2.5 rounded-full" style="width: ${((i + 1) / fileArray.length * 100)}%"></div>
+                        </div>
+                        <div class="mt-2 text-xs text-gray-500">
+                            ${successCount} uploaded, ${failCount} failed
+                        </div>
+                    </div>
+                `;
+
+                try {
+                    // Read file as base64
+                    const base64Data = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            const result = e.target.result;
+                            resolve(result.split(',')[1]);
+                        };
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                    });
+
+                    const mimeType = file.type;
+                    const fileName = `image_${currentIndex + 1}_${Date.now()}.${mimeType.split('/')[1]}`;
+
+                    // Upload to Drive
+                    const uploadResult = await new Promise((resolve) => {
+                        google.script.run
+                            .withSuccessHandler(resolve)
+                            .withFailureHandler((err) => {
+                                resolve({ success: false, message: err.message });
+                            })
+                            .uploadImageToDrive(base64Data, mimeType, fileName, adminState.folderId);
+                    });
+
+                    if (!uploadResult.success) {
+                        failCount++;
+                        continue;
+                    }
+
+                    // Save to spreadsheet
+                    const updateResult = await new Promise((resolve) => {
+                        google.script.run
+                            .withSuccessHandler(resolve)
+                            .withFailureHandler((err) => {
+                                resolve({ success: false, message: err.message });
+                            })
+                            .updateLessonImage(
+                                adminState.currentLessonTitle,
+                                currentIndex,
+                                description,
+                                uploadResult.url,
+                                '[]' // Empty zones initially
+                            );
+                    });
+
+                    if (updateResult.success) {
+                        successCount++;
+                    } else {
+                        failCount++;
+                    }
+
+                } catch (error) {
+                    failCount++;
+                }
+            }
+
+            // Restore original HTML
+            uploadSection.innerHTML = originalHTML;
+
+            // Re-attach event listeners (since we replaced the HTML)
+            document.getElementById('upload-image-btn')?.addEventListener('click', () => document.getElementById('image-file-input').click());
+            document.getElementById('image-file-input')?.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) handleMultipleImageFiles(e.target.files);
+            });
+            document.getElementById('paste-area')?.addEventListener('paste', (e) => {
+                const items = e.clipboardData.items;
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].type.indexOf('image') !== -1) {
+                        handleImageFile(items[i].getAsFile());
+                        break;
+                    }
+                }
+            });
+
+            // Show result
+            showCustomModal({
+                title: 'Upload Complete',
+                message: `Successfully uploaded ${successCount} of ${fileArray.length} images.${failCount > 0 ? ` ${failCount} failed.` : ''}`,
+                type: 'confirm'
+            });
+
+            // Reload the images list
+            loadExistingImages(adminState.currentLessonTitle);
+        }
+
+        /**
          * Clears the current image selection
          */
         function clearImage() {
@@ -2174,7 +2391,14 @@
                     type: 'prompt'
                 }).then(function(label) {
                     if (label !== null) {
-                        adminState.currentZone.label = label;
+                        // Trim and validate label
+                        const trimmedLabel = label.trim();
+                        console.log('Admin zone label entered:', label, '| Trimmed:', trimmedLabel);
+
+                        // Only set label if non-empty, otherwise leave undefined for default fallback
+                        if (trimmedLabel !== '') {
+                            adminState.currentZone.label = trimmedLabel;
+                        }
 
                         // Then ask for target image
                         const imageOptions = [
@@ -2202,7 +2426,10 @@
                                 adminState.currentZone.width = Math.round(adminState.currentZone.width * 100) / 100;
                                 adminState.currentZone.height = Math.round(adminState.currentZone.height * 100) / 100;
 
+                                console.log('Adding admin zone to array:', adminState.currentZone);
                                 adminState.zones.push(adminState.currentZone);
+                                console.log('Total admin zones:', adminState.zones.length, '| All zones:', adminState.zones);
+
                                 updateAdminZonesList();
                             }
                             adminState.currentZone = null;
@@ -2247,13 +2474,52 @@
                             w: ${zone.width}%, h: ${zone.height}%${targetInfo}
                         </div>
                     </div>
-                    <button onclick="deleteAdminZone(${index})" class="ml-2 px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">
-                        Delete
-                    </button>
+                    <div class="flex gap-1 ml-2">
+                        <button onclick="editAdminZone(${index})" class="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">
+                            Edit
+                        </button>
+                        <button onclick="deleteAdminZone(${index})" class="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">
+                            Delete
+                        </button>
+                    </div>
                 </div>
                 `;
             }).join('');
         }
+
+        /**
+         * Edits a zone in the admin zones list
+         */
+        function editAdminZone(index) {
+            const zone = adminState.zones[index];
+            if (!zone) return;
+
+            // Show modal to edit label
+            showCustomModal({
+                title: 'Edit Zone Label',
+                message: 'Enter a new label for this zone (leave empty for default):',
+                type: 'prompt',
+                placeholder: zone.label || `Zone ${index + 1}`
+            }).then(function(newLabel) {
+                if (newLabel !== null) {
+                    const trimmedLabel = newLabel.trim();
+
+                    // Update the zone
+                    if (trimmedLabel !== '') {
+                        adminState.zones[index].label = trimmedLabel;
+                    } else {
+                        // Remove label property to use default
+                        delete adminState.zones[index].label;
+                    }
+
+                    console.log('Admin zone edited:', adminState.zones[index]);
+                    updateAdminZonesList();
+                    redrawAdminCanvas();
+                }
+            });
+        }
+        // Expose to global scope for inline onclick handlers
+        window.editAdminZone = editAdminZone;
 
         /**
          * Deletes a zone from admin zones list
@@ -2522,7 +2788,7 @@
                 // Admin image manager
                 document.getElementById('upload-image-btn')?.addEventListener('click', () => document.getElementById('image-file-input').click());
                 document.getElementById('image-file-input')?.addEventListener('change', (e) => {
-                    if (e.target.files[0]) handleImageFile(e.target.files[0]);
+                    if (e.target.files.length > 0) handleMultipleImageFiles(e.target.files);
                 });
                 document.getElementById('paste-area')?.addEventListener('paste', (e) => {
                     const items = e.clipboardData.items;
