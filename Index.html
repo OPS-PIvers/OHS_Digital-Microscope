@@ -13,6 +13,10 @@
         #simulation-container {
             transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
             cursor: pointer;
+            min-height: 500px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         #simulation-container.has-zones {
             cursor: default;
@@ -23,10 +27,22 @@
         }
         .microscope-image {
             transition: filter 0.8s ease-in-out, transform 1.2s ease-in-out;
+            max-width: 100%;
+            max-height: 100%;
+            display: block;
+            transform-origin: center center;
+        }
+        #main-image {
+            position: relative; /* In document flow, gives container height */
+        }
+        #next-image {
+            /* Next image positioned absolutely for crossfade, overlays main-image */
             position: absolute;
             top: 0;
             left: 0;
-            transform-origin: center center;
+            right: 0;
+            bottom: 0;
+            margin: auto; /* Centers the image */
         }
         .microscope-image.adjusting-focus {
             transition: filter 0.15s ease-out, transform 0.15s ease-out;
@@ -63,10 +79,22 @@
             transition: opacity 0.8s ease-in-out;
         }
 
+        /* Zones overlay positioning - positioned absolutely to overlay the main-image */
+        #zones-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
+
         /* Clickable zone styles */
         .clickable-zone {
             position: absolute;
             cursor: pointer;
+            pointer-events: auto;
             transition: background-color 0.3s ease, transform 0.2s ease;
             border: 2px solid transparent;
             z-index: 10;
@@ -465,9 +493,9 @@
                 <div class="loader"></div>
             </div>
             <div class="flex items-center justify-center gap-6 w-full max-w-5xl mx-auto">
-                <div id="simulation-container" class="relative w-full max-w-3xl aspect-video rounded-lg overflow-hidden shadow-inner border border-gray-200 dark:border-gray-700">
-                    <img id="main-image" src="" alt="Anatomy diagram" class="w-full h-full object-contain microscope-image">
-                    <img id="next-image" src="" alt="Next anatomy diagram" class="w-full h-full object-contain microscope-image" style="opacity: 0; pointer-events: none;">
+                <div id="simulation-container" class="relative w-full max-w-3xl rounded-lg overflow-hidden shadow-inner border border-gray-200 dark:border-gray-700">
+                    <img id="main-image" src="" alt="Anatomy diagram" class="microscope-image">
+                    <img id="next-image" src="" alt="Next anatomy diagram" class="microscope-image" style="opacity: 0; pointer-events: none;">
                     <div id="zones-overlay"></div>
                 </div>
                 <div id="focus-slider-container">
@@ -669,6 +697,7 @@
                 <h2 id="modal-title" class="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-4">Confirmation</h2>
                 <p id="modal-message" class="text-gray-600 dark:text-gray-400 mb-6">Are you sure?</p>
                 <input type="text" id="modal-input" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 hidden mb-4">
+                <div id="modal-multi-fields" class="hidden mb-4"></div>
                 <div class="flex gap-4 justify-end">
                     <button id="modal-cancel-btn" class="px-6 py-2 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 transition-all">
                         Cancel
@@ -705,7 +734,7 @@
          * @param {object} options - { title, message, type ('confirm'|'prompt'|'select'), placeholder, options }
          * @returns {Promise<boolean|string|null>}
          */
-        function showCustomModal({ title, message, type = 'confirm', placeholder = '', options = [], defaultValue = '' }) {
+        function showCustomModal({ title, message, type = 'confirm', placeholder = '', options = [], defaultValue = '', fields = [] }) {
             return new Promise(resolve => {
                 modalResolve = resolve;
 
@@ -720,7 +749,7 @@
 
                 if (type === 'prompt') {
                     modalInput.classList.remove('hidden');
-                    modalInput.value = '';
+                    modalInput.value = defaultValue || '';
                     modalInput.placeholder = placeholder;
                     modalInput.type = 'text';
                     modalConfirmBtn.textContent = 'Submit';
@@ -730,6 +759,7 @@
                         ${options.map(opt => `<option value="${opt.value}" ${opt.value === defaultValue ? 'selected' : ''}>${opt.label}</option>`).join('')}
                     </select>`;
                     modalInput.classList.add('hidden');
+                    document.getElementById('modal-multi-fields').classList.add('hidden');
 
                     // Insert select before the buttons
                     const existingSelect = document.getElementById('modal-select');
@@ -738,8 +768,45 @@
                     }
                     modalInput.insertAdjacentHTML('afterend', selectHtml);
                     modalConfirmBtn.textContent = 'Submit';
+                } else if (type === 'multi') {
+                    // Multi-field form support
+                    modalInput.classList.add('hidden');
+                    const existingSelect = document.getElementById('modal-select');
+                    if (existingSelect) {
+                        existingSelect.remove();
+                    }
+
+                    const multiFieldsContainer = document.getElementById('modal-multi-fields');
+                    multiFieldsContainer.classList.remove('hidden');
+
+                    // Build form fields based on the fields array
+                    // fields format: [{ type: 'text'|'select', id: 'field-id', label: 'Field Label', placeholder: '', value: '', options: [] }]
+                    const fieldsHtml = fields.map(field => {
+                        if (field.type === 'text') {
+                            return `
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">${field.label}</label>
+                                    <input type="text" id="modal-field-${field.id}" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="${field.placeholder || ''}" value="${field.value || ''}">
+                                </div>
+                            `;
+                        } else if (field.type === 'select') {
+                            return `
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">${field.label}</label>
+                                    <select id="modal-field-${field.id}" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        ${field.options.map(opt => `<option value="${opt.value}" ${opt.value === field.value ? 'selected' : ''}>${opt.label}</option>`).join('')}
+                                    </select>
+                                </div>
+                            `;
+                        }
+                        return '';
+                    }).join('');
+
+                    multiFieldsContainer.innerHTML = fieldsHtml;
+                    modalConfirmBtn.textContent = 'Submit';
                 } else {
                     modalInput.classList.add('hidden');
+                    document.getElementById('modal-multi-fields').classList.add('hidden');
                     const existingSelect = document.getElementById('modal-select');
                     if (existingSelect) {
                         existingSelect.remove();
@@ -754,8 +821,19 @@
         function handleModalConfirm() {
             const modalInput = document.getElementById('modal-input');
             const modalSelect = document.getElementById('modal-select');
+            const modalMultiFields = document.getElementById('modal-multi-fields');
+
             if (modalResolve) {
-                if (modalSelect) {
+                if (!modalMultiFields.classList.contains('hidden')) {
+                    // Multi-field form - gather all field values
+                    const fieldValues = {};
+                    const fieldElements = modalMultiFields.querySelectorAll('[id^="modal-field-"]');
+                    fieldElements.forEach(el => {
+                        const fieldId = el.id.replace('modal-field-', '');
+                        fieldValues[fieldId] = el.value;
+                    });
+                    modalResolve(fieldValues);
+                } else if (modalSelect) {
                     // Select type modal
                     modalResolve(modalSelect.value);
                 } else if (!modalInput.classList.contains('hidden')) {
@@ -1016,6 +1094,7 @@
 
         /**
          * Creates clickable zone overlays for the current view.
+         * Uses pixel positioning directly based on image dimensions for accurate alignment.
          */
         function createZoneOverlays(zones) {
             zonesOverlay.innerHTML = ''; // Clear existing zones
@@ -1031,22 +1110,12 @@
             simulationContainer.classList.add('has-zones');
             console.log(`Creating ${zones.length} zone overlays`);
 
-            // Get the actual dimensions of the container and the image
-            const containerRect = simulationContainer.getBoundingClientRect();
+            // Get the rendered dimensions of the image
             const imageRect = mainImage.getBoundingClientRect();
+            const renderedWidth = imageRect.width;
+            const renderedHeight = imageRect.height;
 
-            // Calculate the offset and scale of the image within the container
-            // (due to object-contain, the image might be smaller and centered)
-            const offsetX = imageRect.left - containerRect.left;
-            const offsetY = imageRect.top - containerRect.top;
-            const imageWidth = imageRect.width;
-            const imageHeight = imageRect.height;
-            const containerWidth = containerRect.width;
-            const containerHeight = containerRect.height;
-
-            console.log('Container dimensions:', containerWidth, 'x', containerHeight);
-            console.log('Image dimensions:', imageWidth, 'x', imageHeight);
-            console.log('Image offset:', offsetX, ',', offsetY);
+            console.log('Rendered image dimensions:', renderedWidth, 'x', renderedHeight);
 
             zones.forEach((zone, index) => {
                 console.log(`Zone ${index}:`, zone);
@@ -1054,28 +1123,20 @@
                 const zoneDiv = document.createElement('div');
                 zoneDiv.className = 'clickable-zone';
 
-                // Calculate zone position relative to the actual image, not the container
-                // Zone percentages are relative to the image, so we need to:
-                // 1. Convert percentages to pixels relative to the image
-                // 2. Add the image offset within the container
-                // 3. Convert back to percentages relative to the container
-                const zoneLeftPx = (zone.x / 100) * imageWidth + offsetX;
-                const zoneTopPx = (zone.y / 100) * imageHeight + offsetY;
-                const zoneWidthPx = (zone.width / 100) * imageWidth;
-                const zoneHeightPx = (zone.height / 100) * imageHeight;
+                // Convert zone percentages directly to pixels based on rendered image size
+                // Zone percentages are relative to the image natural dimensions
+                const zoneLeftPx = (zone.x / 100) * renderedWidth;
+                const zoneTopPx = (zone.y / 100) * renderedHeight;
+                const zoneWidthPx = (zone.width / 100) * renderedWidth;
+                const zoneHeightPx = (zone.height / 100) * renderedHeight;
 
-                // Convert to percentages of the container
-                const zoneLeftPercent = (zoneLeftPx / containerWidth) * 100;
-                const zoneTopPercent = (zoneTopPx / containerHeight) * 100;
-                const zoneWidthPercent = (zoneWidthPx / containerWidth) * 100;
-                const zoneHeightPercent = (zoneHeightPx / containerHeight) * 100;
+                // Use pixel positioning directly
+                zoneDiv.style.left = `${zoneLeftPx}px`;
+                zoneDiv.style.top = `${zoneTopPx}px`;
+                zoneDiv.style.width = `${zoneWidthPx}px`;
+                zoneDiv.style.height = `${zoneHeightPx}px`;
 
-                zoneDiv.style.left = `${zoneLeftPercent}%`;
-                zoneDiv.style.top = `${zoneTopPercent}%`;
-                zoneDiv.style.width = `${zoneWidthPercent}%`;
-                zoneDiv.style.height = `${zoneHeightPercent}%`;
-
-                console.log(`Zone ${index} positioned at: left=${zoneLeftPercent.toFixed(2)}%, top=${zoneTopPercent.toFixed(2)}%, width=${zoneWidthPercent.toFixed(2)}%, height=${zoneHeightPercent.toFixed(2)}%`);
+                console.log(`Zone ${index} positioned at: left=${zoneLeftPx.toFixed(2)}px, top=${zoneTopPx.toFixed(2)}px, width=${zoneWidthPx.toFixed(2)}px, height=${zoneHeightPx.toFixed(2)}px`);
 
                 // Add label tooltip
                 const label = document.createElement('div');
@@ -1297,7 +1358,7 @@
             // Reset any ongoing animations
             awaitingFocusAdjustment = false;
             focusSliderContainer.classList.remove('visible');
-            mainImage.className = 'w-full h-full object-contain microscope-image';
+            mainImage.className = 'microscope-image';
             mainImage.style.filter = ''; // Clear any blur
             mainImage.style.transform = ''; // Clear any scale
             simulationContainer.style.backgroundColor = '';
@@ -1306,6 +1367,8 @@
             mainImage.src = view.imageUrl;
 
             mainImage.onload = () => {
+                console.log(`Image loaded: ${mainImage.naturalWidth}x${mainImage.naturalHeight}`);
+
                 // Create clickable zones if they exist
                 createZoneOverlays(view.zones);
                 // Show back button if there's history or if not at the first view
@@ -1569,7 +1632,7 @@
             const img = new Image();
             img.onload = () => {
                 coordHelperState.image = img;
-                const maxWidth = 800;
+                const maxWidth = 768;
                 const aspectRatio = img.height / img.width;
                 coordHelperState.canvas.width = Math.min(img.width, maxWidth);
                 coordHelperState.canvas.height = coordHelperState.canvas.width * aspectRatio;
@@ -2221,120 +2284,126 @@
             const zone = coordHelperState.zones[index];
             if (!zone) return;
 
-            // Show modal to edit label
-            showCustomModal({
-                title: 'Edit Zone Label',
-                message: 'Enter a new label for this zone (leave empty for default):',
-                type: 'prompt',
-                placeholder: zone.label || `Zone ${index + 1}`
-            }).then(function(newLabel) {
-                if (newLabel !== null) {
-                    const trimmedLabel = newLabel.trim();
+            // Prepare image options for the action dropdown
+            const imageOptions = [
+                { value: '', label: 'None (Sequential navigation)' },
+                { value: 'banner', label: '📝 Display Text Banner' },
+                ...coordHelperState.lessonImages.map(img => ({
+                    value: img.index.toString(),
+                    label: `Image ${img.index + 1}: ${img.description}`
+                }))
+            ];
 
-                    // Update the zone label
-                    if (trimmedLabel !== '') {
-                        coordHelperState.zones[index].label = trimmedLabel;
+            // Determine current action value
+            let currentAction = '';
+            if (zone.actionType === 'banner') {
+                currentAction = 'banner';
+            } else if (zone.targetView !== undefined) {
+                currentAction = zone.targetView.toString();
+            }
+
+            // First modal: Label + Action selection
+            showCustomModal({
+                title: 'Edit Zone',
+                message: 'Update the zone label and click action:',
+                type: 'multi',
+                fields: [
+                    {
+                        type: 'text',
+                        id: 'label',
+                        label: 'Zone Label',
+                        placeholder: zone.label || `Zone ${index + 1}`,
+                        value: zone.label || ''
+                    },
+                    {
+                        type: 'select',
+                        id: 'action',
+                        label: 'Click Action',
+                        value: currentAction,
+                        options: imageOptions
+                    }
+                ]
+            }).then(function(values) {
+                if (values !== null) {
+                    const newLabel = values.label.trim();
+                    const selectedAction = values.action;
+
+                    // Update label
+                    if (newLabel !== '') {
+                        coordHelperState.zones[index].label = newLabel;
                     } else {
-                        // Remove label property to use default
                         delete coordHelperState.zones[index].label;
                     }
 
-                    // Then ask for action type
-                    const imageOptions = [
-                        { value: '', label: 'None (Sequential navigation)' },
-                        { value: 'banner', label: '📝 Display Text Banner' },
-                        ...coordHelperState.lessonImages.map(img => ({
-                            value: img.index.toString(),
-                            label: `Image ${img.index + 1}: ${img.description}`
-                        }))
-                    ];
-
-                    // Set current value as default
-                    let currentTarget = '';
-                    if (zone.actionType === 'banner') {
-                        currentTarget = 'banner';
-                    } else if (zone.targetView !== undefined) {
-                        currentTarget = zone.targetView.toString();
-                    }
-
-                    showCustomModal({
-                        title: 'Select Action',
-                        message: 'What should happen when this zone is clicked?',
-                        type: 'select',
-                        options: imageOptions,
-                        defaultValue: currentTarget
-                    }).then(function(targetView) {
-                        if (targetView !== null) {
-                            // Check if banner option was selected
-                            if (targetView === 'banner') {
-                                // Ask for banner text
-                                const currentBannerText = zone.bannerText || '';
-                                showCustomModal({
-                                    title: 'Banner Text',
-                                    message: 'Enter the text to display in the banner:',
-                                    type: 'prompt',
+                    // Handle banner action
+                    if (selectedAction === 'banner') {
+                        // Second modal: Banner text + position
+                        showCustomModal({
+                            title: 'Configure Text Banner',
+                            message: 'Enter the banner text and position:',
+                            type: 'multi',
+                            fields: [
+                                {
+                                    type: 'text',
+                                    id: 'bannerText',
+                                    label: 'Banner Text',
                                     placeholder: 'e.g., This is the mitochondria, the powerhouse of the cell!',
-                                    defaultValue: currentBannerText
-                                }).then(function(bannerText) {
-                                    if (bannerText !== null && bannerText.trim() !== '') {
-                                        // Ask for banner position
-                                        const currentPosition = zone.bannerPosition || 'bottom';
-                                        showCustomModal({
-                                            title: 'Banner Position',
-                                            message: 'Where should the banner appear?',
-                                            type: 'select',
-                                            options: [
-                                                { value: 'top', label: 'Top of screen' },
-                                                { value: 'bottom', label: 'Bottom of screen' }
-                                            ],
-                                            defaultValue: currentPosition
-                                        }).then(function(position) {
-                                            if (position !== null) {
-                                                // Remove old properties
-                                                delete coordHelperState.zones[index].targetView;
-                                                // Set banner properties
-                                                coordHelperState.zones[index].actionType = 'banner';
-                                                coordHelperState.zones[index].bannerText = bannerText.trim();
-                                                coordHelperState.zones[index].bannerPosition = position;
-
-                                                console.log('Zone edited:', coordHelperState.zones[index]);
-                                                updateZonesList();
-                                                updateJsonOutput();
-                                                redrawCanvas();
-                                            }
-                                        });
-                                    }
-                                });
-                            }
-                            // Update targetView if a specific image was selected
-                            else if (targetView !== '') {
-                                // Remove old banner properties
-                                delete coordHelperState.zones[index].actionType;
-                                delete coordHelperState.zones[index].bannerText;
-                                delete coordHelperState.zones[index].bannerPosition;
-                                // Set target view
-                                coordHelperState.zones[index].targetView = parseInt(targetView);
-
-                                console.log('Zone edited:', coordHelperState.zones[index]);
-                                updateZonesList();
-                                updateJsonOutput();
-                                redrawCanvas();
-                            }
-                            // Sequential navigation (no targetView)
-                            else {
-                                // Remove all action properties
+                                    value: zone.bannerText || ''
+                                },
+                                {
+                                    type: 'select',
+                                    id: 'bannerPosition',
+                                    label: 'Banner Position',
+                                    value: zone.bannerPosition || 'bottom',
+                                    options: [
+                                        { value: 'top', label: 'Top of screen' },
+                                        { value: 'bottom', label: 'Bottom of screen' }
+                                    ]
+                                }
+                            ]
+                        }).then(function(bannerValues) {
+                            if (bannerValues !== null && bannerValues.bannerText.trim() !== '') {
+                                // Remove old properties
                                 delete coordHelperState.zones[index].targetView;
-                                delete coordHelperState.zones[index].actionType;
-                                delete coordHelperState.zones[index].bannerText;
-                                delete coordHelperState.zones[index].bannerPosition;
+                                // Set banner properties
+                                coordHelperState.zones[index].actionType = 'banner';
+                                coordHelperState.zones[index].bannerText = bannerValues.bannerText.trim();
+                                coordHelperState.zones[index].bannerPosition = bannerValues.bannerPosition;
 
                                 console.log('Zone edited:', coordHelperState.zones[index]);
                                 updateZonesList();
                                 updateJsonOutput();
                                 redrawCanvas();
                             }
-                        }
-                    });
+                        });
+                    }
+                    // Handle image navigation
+                    else if (selectedAction !== '') {
+                        // Remove old banner properties
+                        delete coordHelperState.zones[index].actionType;
+                        delete coordHelperState.zones[index].bannerText;
+                        delete coordHelperState.zones[index].bannerPosition;
+                        // Set target view
+                        coordHelperState.zones[index].targetView = parseInt(selectedAction);
+
+                        console.log('Zone edited:', coordHelperState.zones[index]);
+                        updateZonesList();
+                        updateJsonOutput();
+                        redrawCanvas();
+                    }
+                    // Handle sequential navigation (no action)
+                    else {
+                        // Remove all action properties
+                        delete coordHelperState.zones[index].targetView;
+                        delete coordHelperState.zones[index].actionType;
+                        delete coordHelperState.zones[index].bannerText;
+                        delete coordHelperState.zones[index].bannerPosition;
+
+                        console.log('Zone edited:', coordHelperState.zones[index]);
+                        updateZonesList();
+                        updateJsonOutput();
+                        redrawCanvas();
+                    }
                 }
             });
         }
@@ -2619,7 +2688,7 @@
         /**
          * Shows the image manager view
          */
-        function showImageManager(lessonName) {
+        function showImageManager(lessonName, savedImageIndex = null, savedZones = null) {
             document.getElementById('admin-lesson-list').classList.add('hidden');
             document.getElementById('admin-lesson-form').classList.add('hidden');
             document.getElementById('admin-image-manager').classList.remove('hidden');
@@ -2635,18 +2704,18 @@
 
 
             // Load existing images for this lesson
-            loadExistingImages(lessonName);
+            loadExistingImages(lessonName, savedImageIndex, savedZones);
         }
 
         /**
          * Loads existing images for a lesson
          */
-        function loadExistingImages(lessonName) {
+        function loadExistingImages(lessonName, savedImageIndex = null, savedZones = null) {
             showSkeletonLoader(document.getElementById('existing-images-list'), 2, 'image');
             google.script.run
                 .withSuccessHandler((result) => {
                     if (result.success) {
-                        displayExistingImages(result.data.images);
+                        displayExistingImages(result.data.images, savedImageIndex, savedZones);
                         adminState.currentImageIndex = result.data.images.length;
                     } else {
                         document.getElementById('existing-images-list').innerHTML = `<p class="text-red-500">${result.message}</p>`;
@@ -2662,9 +2731,18 @@
         /**
          * Displays existing images in the admin interface
          */
-        function displayExistingImages(images) {
+        function displayExistingImages(images, savedImageIndex = null, savedZones = null) {
             const container = document.getElementById('existing-images-list');
             container.innerHTML = '';
+
+            // If we just saved zones for an image, update that image's zones with the fresh data
+            // to prevent race condition where backend data is stale
+            if (savedImageIndex !== null && savedZones !== null) {
+                const imageToUpdate = images.find(img => img.index === savedImageIndex);
+                if (imageToUpdate) {
+                    imageToUpdate.zones = savedZones;
+                }
+            }
 
             // Store images for target selection in zones
             adminState.lessonImages = images;
@@ -3008,7 +3086,7 @@
             const img = new Image();
             img.onload = () => {
                 adminState.image = img;
-                const maxWidth = 800;
+                const maxWidth = 768;
                 const aspectRatio = img.height / img.width;
                 adminState.canvas.width = Math.min(img.width, maxWidth);
                 adminState.canvas.height = adminState.canvas.width * aspectRatio;
@@ -3476,13 +3554,18 @@
             const saveBtn = document.getElementById('admin-save-zones-btn');
             showButtonLoader(saveBtn, 'Saving...');
 
+            // Store the image index and zones we're saving
+            const savedImageIndex = adminState.currentImage.index;
+            const savedZones = zonesJson;
+
             google.script.run
                 .withSuccessHandler((result) => {
                     hideButtonLoader(saveBtn);
                     if (result.success) {
                          showCustomModal({ title: 'Success', message: 'Zones saved successfully!', type: 'confirm'});
                         adminState.currentImageIndex++;
-                        showImageManager(adminState.currentLessonTitle);
+                        // Pass the saved image index and zones to prevent stale data
+                        showImageManager(adminState.currentLessonTitle, savedImageIndex, savedZones);
                     } else {
                         showCustomModal({ title: 'Error', message: 'Error saving zones: ' + result.message, type: 'confirm'});
                     }
