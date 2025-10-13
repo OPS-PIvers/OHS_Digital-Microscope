@@ -114,12 +114,15 @@
             padding: 6px 12px;
             border-radius: 6px;
             font-size: 14px;
+            line-height: 1.2;
             font-weight: 600;
-            white-space: nowrap;
+            white-space: normal; /* Allow text to wrap */
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.3s ease, transform 0.3s ease;
             z-index: 20;
+            height: auto; /* Ensure height is calculated automatically */
+            min-height: 26px; /* Add min-height to prevent collapse */
         }
         .clickable-zone:hover .zone-label {
             opacity: 1;
@@ -275,14 +278,13 @@
 
         /* Zone Banner Styles */
         #zone-banner {
-            position: fixed;
-            left: 0;
-            right: 0;
+            position: absolute;
+            width: 100%;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 16px 20px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            z-index: 1000;
+            z-index: 20;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -331,12 +333,6 @@
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 flex items-center justify-center min-h-screen p-4">
 
-    <!-- Zone Banner (Hidden by default) -->
-    <div id="zone-banner" class="bottom">
-        <div id="zone-banner-text"></div>
-        <button id="zone-banner-close" aria-label="Close banner">&times;</button>
-    </div>
-
     <div class="w-full max-w-5xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 lg:p-10">
 
         <!-- View 1: Landing Page -->
@@ -361,128 +357,6 @@
             </div>
         </div>
 
-        <!-- View 2: Coordinate Helper (Initially Hidden) -->
-        <div id="coordinate-helper-view" class="hidden">
-
-            <!-- Coordinate Helper Sub-View 1: Lesson Selection -->
-            <div id="coord-lesson-selection">
-                <header class="text-center mb-6">
-                    <h1 class="text-3xl md:text-4xl font-bold text-blue-600 dark:text-blue-400">📍 Coordinate Helper Tool</h1>
-                    <p class="text-md text-gray-600 dark:text-gray-400 mt-2">Select a lesson to add clickable zones</p>
-                </header>
-                <div id="coord-loader-container" class="flex justify-center items-center p-8">
-                    <div class="loader"></div>
-                </div>
-                <div id="coord-lesson-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <!-- Lesson cards will be injected here by JavaScript -->
-                </div>
-            </div>
-
-            <!-- Coordinate Helper Sub-View 2: Image Selection -->
-            <div id="coord-image-selection" class="hidden">
-                <header class="text-center mb-4">
-                    <h1 id="coord-lesson-title" class="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400"></h1>
-                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Select an image to define zones</p>
-                </header>
-                <div id="coord-images-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <!-- Image cards will be injected here by JavaScript -->
-                </div>
-                <button id="coord-back-to-lessons" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-all">
-                    ← Back to Lessons
-                </button>
-            </div>
-
-            <!-- Coordinate Helper Sub-View 3: Canvas Editor -->
-            <div id="coord-canvas-editor" class="hidden">
-                <header class="text-center mb-4">
-                    <h1 id="coord-canvas-title" class="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400">Zone Editor</h1>
-                    <p id="coord-canvas-subtitle" class="text-sm text-gray-600 dark:text-gray-400 mt-1"></p>
-                </header>
-
-                <div class="mb-4">
-                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                        <strong>Instructions:</strong><br>
-                        - <strong>Rectangle Mode:</strong> Click and drag to create a rectangle.<br>
-                        - <strong>Polygon Mode:</strong> Click to place points. Click the first point to close the shape.
-                    </p>
-                </div>
-
-                <div class="flex items-center justify-center gap-2 mb-4">
-                    <button id="draw-mode-rect" class="px-4 py-2 text-sm font-semibold rounded-lg transition-all">Rectangle</button>
-                    <button id="draw-mode-poly" class="px-4 py-2 text-sm font-semibold rounded-lg transition-all">Polygon</button>
-                </div>
-                <div class="relative w-full max-w-3xl mx-auto bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden border-2 border-gray-300 dark:border-gray-600" id="canvas-wrapper">
-                    <div id="canvas-loader" class="absolute inset-0 bg-gray-200/50 dark:bg-gray-800/50 flex items-center justify-center hidden z-10"><div class="loader"></div></div>
-                    <canvas id="coord-canvas" class="w-full cursor-crosshair"></canvas>
-                </div>
-
-                <div class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <!-- Zone List -->
-                    <div>
-                        <h3 class="font-bold text-lg mb-2">Defined Zones:</h3>
-                        <div id="zones-list" class="space-y-2 max-h-64 overflow-y-auto">
-                            <p class="text-sm text-gray-500 dark:text-gray-400">No zones defined yet. Click and drag on the image to create zones.</p>
-                        </div>
-                    </div>
-
-                    <!-- JSON Output -->
-                    <div>
-                        <h3 class="font-bold text-lg mb-2">JSON Output:</h3>
-
-                        <!-- Context Info -->
-                        <div id="coord-context-info" class="mb-3 p-2 bg-blue-50 dark:bg-blue-900 rounded text-xs">
-                            <strong>Lesson:</strong> <span id="json-lesson-name"></span><br>
-                            <strong>Image:</strong> <span id="json-image-index"></span> - <span id="json-image-desc"></span>
-                        </div>
-
-                        <!-- Zones Array (For Spreadsheet) -->
-                        <div class="mb-3">
-                            <div class="flex items-center justify-between mb-1">
-                                <label class="text-sm font-bold text-green-700 dark:text-green-400">✅ Zones Array (Paste into Spreadsheet)</label>
-                                <button id="copy-zones-array" class="px-3 py-1 bg-green-600 text-white text-xs font-semibold rounded hover:bg-green-700 transition-all">
-                                    📋 Copy
-                                </button>
-                            </div>
-                            <textarea id="json-zones-array" readonly
-                                      class="w-full h-24 px-3 py-2 border-2 border-green-500 dark:border-green-600 rounded-lg bg-white dark:bg-gray-700 font-mono text-xs resize-none"
-                                      placeholder="[]"></textarea>
-                            <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                                ⬆️ Copy this and paste into the <strong>Zones column</strong> of your spreadsheet
-                            </p>
-                        </div>
-
-                        <!-- Full Metadata (Reference) -->
-                        <div class="mb-3">
-                            <div class="flex items-center justify-between mb-1">
-                                <label class="text-sm font-semibold text-gray-600 dark:text-gray-400">📄 Full Metadata (Reference Only)</label>
-                                <button id="copy-full-metadata" class="px-3 py-1 bg-gray-500 text-white text-xs font-semibold rounded hover:bg-gray-600 transition-all">
-                                    📋 Copy
-                                </button>
-                            </div>
-                            <textarea id="json-full-metadata" readonly
-                                      class="w-full h-24 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 font-mono text-xs resize-none"
-                                      placeholder="{}"></textarea>
-                        </div>
-
-                        <!-- Action Buttons -->
-                        <button id="clear-zones" class="mt-2 px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-all">
-                            🗑️ Clear All Zones
-                        </button>
-                    </div>
-                </div>
-
-                <div class="mt-4 flex gap-2">
-                    <button id="coord-back-to-images" class="px-6 py-2 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 transition-all">
-                        ← Back to Images
-                    </button>
-                    <button id="coord-back-to-lessons-from-canvas" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-all">
-                        ← Back to Lessons
-                    </button>
-                </div>
-            </div>
-
-        </div>
-
         <!-- View 3: Simulation View (Initially Hidden) -->
         <div id="simulation-view" class="hidden">
             <header class="text-center mb-6 px-4 md:px-6 lg:px-8">
@@ -493,10 +367,15 @@
                 <div class="loader"></div>
             </div>
             <div class="flex items-center justify-center gap-6 w-full max-w-5xl mx-auto">
-                <div id="simulation-container" class="relative w-full max-w-3xl rounded-lg overflow-hidden shadow-inner border border-gray-200 dark:border-gray-700">
+                <div id="simulation-container" class="relative w-full max-w-3xl rounded-lg overflow-visible shadow-inner border border-gray-200 dark:border-gray-700">
                     <img id="main-image" src="" alt="Anatomy diagram" class="microscope-image">
                     <img id="next-image" src="" alt="Next anatomy diagram" class="microscope-image" style="opacity: 0; pointer-events: none;">
                     <div id="zones-overlay"></div>
+                    <!-- Zone Banner (Hidden by default) -->
+                    <div id="zone-banner" class="bottom">
+                        <div id="zone-banner-text"></div>
+                        <button id="zone-banner-close" aria-label="Close banner">&times;</button>
+                    </div>
                 </div>
                 <div id="focus-slider-container">
                     <div id="focus-slider-label">🔬 Adjust Focus</div>
@@ -614,7 +493,7 @@
                 </div>
             </div>
 
-            <!-- Admin Sub-View 4: Zone Editor (Integrated from Coordinate Helper) -->
+            <!-- Admin Sub-View 4: Zone Editor -->
             <div id="admin-zone-editor" class="hidden">
                 <header class="text-center mb-4">
                     <h1 id="admin-zone-editor-title" class="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400">Define Click Zones</h1>
@@ -1093,6 +972,26 @@
         }
 
         /**
+         * Checks if a point is inside a polygon using ray casting algorithm.
+         * @param {number} x - X coordinate of the point
+         * @param {number} y - Y coordinate of the point
+         * @param {Array} points - Array of {x, y} points defining the polygon
+         * @returns {boolean} - True if point is inside the polygon
+         */
+        function isPointInPolygon(x, y, points) {
+            let inside = false;
+            for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+                const xi = points[i].x, yi = points[i].y;
+                const xj = points[j].x, yj = points[j].y;
+
+                const intersect = ((yi > y) !== (yj > y)) &&
+                    (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        }
+
+        /**
          * Creates clickable zone overlays for the current view.
          * Uses pixel positioning directly based on image dimensions for accurate alignment.
          */
@@ -1120,56 +1019,155 @@
             zones.forEach((zone, index) => {
                 console.log(`Zone ${index}:`, zone);
 
-                const zoneDiv = document.createElement('div');
-                zoneDiv.className = 'clickable-zone';
+                // Handle polygon zones differently from rectangular zones
+                if (zone.type === 'poly' && zone.points && zone.points.length > 0) {
+                    // Create SVG element for polygon zone
+                    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                    svg.style.position = 'absolute';
+                    svg.style.top = '0';
+                    svg.style.left = '0';
+                    svg.style.width = '100%';
+                    svg.style.height = '100%';
+                    svg.style.pointerEvents = 'none';
+                    svg.style.zIndex = '10';
 
-                // Convert zone percentages directly to pixels based on rendered image size
-                // Zone percentages are relative to the image natural dimensions
-                const zoneLeftPx = (zone.x / 100) * renderedWidth;
-                const zoneTopPx = (zone.y / 100) * renderedHeight;
-                const zoneWidthPx = (zone.width / 100) * renderedWidth;
-                const zoneHeightPx = (zone.height / 100) * renderedHeight;
+                    // Convert percentage points to pixel coordinates
+                    const pixelPoints = zone.points.map(p => ({
+                        x: (p.x / 100) * renderedWidth,
+                        y: (p.y / 100) * renderedHeight
+                    }));
 
-                // Use pixel positioning directly
-                zoneDiv.style.left = `${zoneLeftPx}px`;
-                zoneDiv.style.top = `${zoneTopPx}px`;
-                zoneDiv.style.width = `${zoneWidthPx}px`;
-                zoneDiv.style.height = `${zoneHeightPx}px`;
+                    // Create polygon element
+                    const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                    const pointsString = pixelPoints.map(p => `${p.x},${p.y}`).join(' ');
+                    polygon.setAttribute('points', pointsString);
+                    polygon.setAttribute('fill', 'transparent');
+                    polygon.setAttribute('stroke', 'transparent');
+                    polygon.setAttribute('stroke-width', '2');
+                    polygon.style.cursor = 'pointer';
+                    polygon.style.pointerEvents = 'auto';
+                    polygon.style.transition = 'fill 0.3s ease, stroke 0.3s ease';
 
-                console.log(`Zone ${index} positioned at: left=${zoneLeftPx.toFixed(2)}px, top=${zoneTopPx.toFixed(2)}px, width=${zoneWidthPx.toFixed(2)}px, height=${zoneHeightPx.toFixed(2)}px`);
+                    console.log(`Polygon zone ${index} created with ${zone.points.length} points`);
 
-                // Add label tooltip
-                const label = document.createElement('div');
-                label.className = 'zone-label';
-                label.textContent = zone.label || `Zone ${index + 1}`;
-                zoneDiv.appendChild(label);
+                    // Add hover effects
+                    polygon.addEventListener('mouseenter', () => {
+                        polygon.setAttribute('fill', 'rgba(59, 130, 246, 0.2)');
+                        polygon.setAttribute('stroke', 'rgba(59, 130, 246, 0.5)');
+                    });
 
-                // Add click handler for zone
-                zoneDiv.addEventListener('click', (e) => {
-                    console.log(`Zone ${index} clicked!`);
-                    e.stopPropagation();
+                    polygon.addEventListener('mouseleave', () => {
+                        polygon.setAttribute('fill', 'transparent');
+                        polygon.setAttribute('stroke', 'transparent');
+                    });
 
-                    // Check if zone displays a banner
-                    if (zone.actionType === 'banner' && zone.bannerText) {
-                        const position = zone.bannerPosition || 'bottom';
-                        showZoneBanner(zone.bannerText, position);
-                    }
-                    // Check if zone has a specific target view
-                    else if (zone.targetView !== undefined && zone.targetView !== null) {
-                        const targetIndex = parseInt(zone.targetView);
-                        if (targetIndex >= 0 && targetIndex < currentLessonViews.length) {
-                            navigateToView(targetIndex);
-                        } else {
-                            console.error(`Invalid targetView ${targetIndex} for zone ${index}`);
-                            zoomToNextView(); // Fallback to sequential navigation
+                    // Add click handler for polygon zone
+                    polygon.addEventListener('click', (e) => {
+                        console.log(`Polygon zone ${index} clicked!`);
+                        e.stopPropagation();
+
+                        // Check if zone displays a banner
+                        if (zone.actionType === 'banner' && zone.bannerText) {
+                            const position = zone.bannerPosition || 'bottom';
+                            showZoneBanner(zone.bannerText, position);
                         }
-                    } else {
-                        // Default behavior: advance to next view sequentially
-                        zoomToNextView();
-                    }
-                });
+                        // Check if zone has a specific target view
+                        else if (zone.targetView !== undefined && zone.targetView !== null) {
+                            const targetIndex = parseInt(zone.targetView);
+                            if (targetIndex >= 0 && targetIndex < currentLessonViews.length) {
+                                navigateToView(targetIndex);
+                            } else {
+                                console.error(`Invalid targetView ${targetIndex} for zone ${index}`);
+                                zoomToNextView();
+                            }
+                        } else {
+                            // Default behavior: advance to next view sequentially
+                            zoomToNextView();
+                        }
+                    });
 
-                zonesOverlay.appendChild(zoneDiv);
+                    svg.appendChild(polygon);
+
+                                            // Add label for polygon zone
+                                            if (zone.label) {
+                                                const labelDiv = document.createElement('div');
+                                                labelDiv.className = 'zone-label';
+                                                labelDiv.textContent = zone.label;
+                                                labelDiv.style.position = 'absolute';
+                                                // Position label at first point of polygon
+                                                labelDiv.style.left = `${pixelPoints[0].x}px`;
+                                                labelDiv.style.top = `${pixelPoints[0].y}px`;
+                                                                                                                                                labelDiv.style.transform = 'translate(-50%, -100%) translateY(-8px)';
+                                                                                                                                                labelDiv.style.marginTop = ''; // Unset any inherited margin
+                                                                                                                                                labelDiv.style.pointerEvents = 'none';
+                                                                                                                                                labelDiv.style.opacity = '0';
+                                                                                                                                                labelDiv.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                                                                                                                                                labelDiv.style.zIndex = '20';
+                                                                                                                    
+                                                                                                                                                // Show label on polygon hover
+                                                                                                                                                polygon.addEventListener('mouseenter', () => {
+                                                                                                                                                    labelDiv.style.opacity = '1';
+                                                                                                                                                    labelDiv.style.transform = 'translate(-50%, -100%) translateY(-12px)';
+                                                                                                                                                });
+                                                                                                                    
+                                                                                                                                                polygon.addEventListener('mouseleave', () => {
+                                                                                                                                                    labelDiv.style.opacity = '0';
+                                                                                                                                                    labelDiv.style.transform = 'translate(-50%, -100%) translateY(-8px)';
+                                                                                                                                                });                                                zonesOverlay.appendChild(labelDiv);
+                                            }
+                    zonesOverlay.appendChild(svg);
+                } else {
+                    // Handle rectangular zones (original code)
+                    const zoneDiv = document.createElement('div');
+                    zoneDiv.className = 'clickable-zone';
+
+                    // Convert zone percentages directly to pixels based on rendered image size
+                    const zoneLeftPx = (zone.x / 100) * renderedWidth;
+                    const zoneTopPx = (zone.y / 100) * renderedHeight;
+                    const zoneWidthPx = (zone.width / 100) * renderedWidth;
+                    const zoneHeightPx = (zone.height / 100) * renderedHeight;
+
+                    // Use pixel positioning directly
+                    zoneDiv.style.left = `${zoneLeftPx}px`;
+                    zoneDiv.style.top = `${zoneTopPx}px`;
+                    zoneDiv.style.width = `${zoneWidthPx}px`;
+                    zoneDiv.style.height = `${zoneHeightPx}px`;
+
+                    console.log(`Rectangle zone ${index} positioned at: left=${zoneLeftPx.toFixed(2)}px, top=${zoneTopPx.toFixed(2)}px, width=${zoneWidthPx.toFixed(2)}px, height=${zoneHeightPx.toFixed(2)}px`);
+
+                    // Add label tooltip
+                    const label = document.createElement('div');
+                    label.className = 'zone-label';
+                    label.textContent = zone.label || `Zone ${index + 1}`;
+                    zoneDiv.appendChild(label);
+
+                    // Add click handler for rectangular zone
+                    zoneDiv.addEventListener('click', (e) => {
+                        console.log(`Rectangle zone ${index} clicked!`);
+                        e.stopPropagation();
+
+                        // Check if zone displays a banner
+                        if (zone.actionType === 'banner' && zone.bannerText) {
+                            const position = zone.bannerPosition || 'bottom';
+                            showZoneBanner(zone.bannerText, position);
+                        }
+                        // Check if zone has a specific target view
+                        else if (zone.targetView !== undefined && zone.targetView !== null) {
+                            const targetIndex = parseInt(zone.targetView);
+                            if (targetIndex >= 0 && targetIndex < currentLessonViews.length) {
+                                navigateToView(targetIndex);
+                            } else {
+                                console.error(`Invalid targetView ${targetIndex} for zone ${index}`);
+                                zoomToNextView();
+                            }
+                        } else {
+                            // Default behavior: advance to next view sequentially
+                            zoomToNextView();
+                        }
+                    });
+
+                    zonesOverlay.appendChild(zoneDiv);
+                }
             });
         }
 
@@ -1433,10 +1431,6 @@
         // --- INITIALIZATION ---
         window.addEventListener('load', () => {
             try {
-                if (TOOL_MODE === 'coordinates') {
-                    initializeCoordinateHelper();
-                    return;
-                }
                 if (typeof google !== 'undefined' && google.script && google.script.run) {
                     google.script.run
                         .withSuccessHandler(buildLandingPage)
@@ -1456,983 +1450,6 @@
             }
         });
 
-        // ==============================
-        // COORDINATE HELPER FUNCTIONALITY
-        // ==============================
-
-        let coordHelperState = {
-            canvas: null, ctx: null, image: null, zones: [], isDrawing: false,
-            startX: 0, startY: 0, currentZone: null, initialized: false,
-            currentLesson: null, currentImageIndex: null, currentImageDesc: null,
-            lessonImages: [], // Store all images in the lesson for target selection
-            drawMode: 'rect', // 'rect' or 'poly'
-            currentPolygon: [], // Array of points for the polygon being drawn
-        };
-
-        function buildCoordinateHelperLandingPage(lessons) {
-            const coordLoaderContainer = document.getElementById('coord-loader-container');
-            const coordLessonCardsContainer = document.getElementById('coord-lesson-cards-container');
-
-            coordLoaderContainer.style.display = 'none';
-            coordLessonCardsContainer.innerHTML = '';
-
-            if (lessons.length > 0 && lessons[0].error) {
-                coordLessonCardsContainer.innerHTML = `<p class="text-red-500 col-span-full text-center">${lessons[0].error}</p>`;
-                return;
-            }
-
-            lessons.forEach(lesson => {
-                const card = document.createElement('div');
-                card.className = 'lesson-card bg-gray-50 dark:bg-gray-700 rounded-lg shadow-md overflow-hidden cursor-pointer';
-                card.innerHTML = `
-                    <img src="${lesson.previewImage || 'https://placehold.co/600x400/eeeeee/333333?text=No+Image'}" alt="${lesson.name}" class="w-full h-40 object-cover" onerror="this.src='https://placehold.co/600x400/eeeeee/333333?text=Image+Error'">
-                    <div class="p-6 text-center">
-                        <h3 class="font-bold text-lg">${lesson.name}</h3>
-                        <p class="text-gray-600 dark:text-gray-400 text-sm mt-1">${lesson.description || 'No description available.'}</p>
-                    </div>
-                `;
-                card.addEventListener('click', () => {
-                    showCardLoader(card);
-                    selectLessonForCoordinates(lesson.name);
-                });
-                coordLessonCardsContainer.appendChild(card);
-            });
-        }
-
-        function selectLessonForCoordinates(lessonName) {
-            document.getElementById('coord-lesson-selection').classList.add('hidden');
-            document.getElementById('coord-image-selection').classList.remove('hidden');
-            document.getElementById('coord-lesson-title').textContent = lessonName;
-            coordHelperState.currentLesson = lessonName;
-            
-            showSkeletonLoader(document.getElementById('coord-images-grid'), 2, 'image');
-            
-            google.script.run
-                .withSuccessHandler(displayImagesForCoordinates)
-                .withFailureHandler((err) => {
-                    document.getElementById('coord-images-grid').innerHTML = '';
-                    onScriptRunFailure(err);
-                })
-                .getLessonDataForCoordinates(lessonName);
-        }
-
-        function displayImagesForCoordinates(images) {
-            const coordImagesGrid = document.getElementById('coord-images-grid');
-            coordImagesGrid.innerHTML = '';
-
-            // Store images for target selection
-            coordHelperState.lessonImages = images;
-
-            if (images.length === 0) {
-                coordImagesGrid.innerHTML = '<p class="text-gray-500 col-span-full text-center">This lesson has no images.</p>';
-                return;
-            }
-
-            images.forEach((image, idx) => {
-                const imageCard = document.createElement('div');
-                imageCard.className = 'lesson-card bg-gray-50 dark:bg-gray-700 rounded-lg shadow-md overflow-hidden cursor-pointer';
-                imageCard.innerHTML = `
-                    <img src="${image.imageUrl}" alt="${image.description}" class="w-full h-48 object-cover" onerror="this.src='https://placehold.co/600x400/eeeeee/333333?text=Image+Error'">
-                    <div class="p-6">
-                        <h3 class="font-semibold text-md">Image ${image.index + 1}</h3>
-                        <p class="text-gray-600 dark:text-gray-400 text-sm mt-1">${image.description}</p>
-                    </div>
-                `;
-                imageCard.addEventListener('click', () => {
-                    showCardLoader(imageCard);
-                    selectImageForCoordinates(image.imageUrl, image.description, image.index);
-                });
-                coordImagesGrid.appendChild(imageCard);
-            });
-        }
-
-        function selectImageForCoordinates(imageUrl, description, imageIndex) {
-            document.getElementById('coord-image-selection').classList.add('hidden');
-            document.getElementById('coord-canvas-editor').classList.remove('hidden');
-            document.getElementById('coord-canvas-title').textContent = `Zone Editor: ${coordHelperState.currentLesson}`;
-            document.getElementById('coord-canvas-subtitle').textContent = `Loading image...`;
-            document.getElementById('json-lesson-name').textContent = coordHelperState.currentLesson;
-            document.getElementById('json-image-index').textContent = `Image ${imageIndex + 1}`;
-            document.getElementById('json-image-desc').textContent = description;
-
-            coordHelperState.currentImageIndex = imageIndex;
-            coordHelperState.currentImageDesc = description;
-            coordHelperState.zones = [];
-            updateZonesList();
-            updateJsonOutput();
-            
-            const canvasLoader = document.getElementById('canvas-loader');
-            canvasLoader.classList.remove('hidden');
-
-            google.script.run
-                .withSuccessHandler((base64DataUrl) => {
-                    canvasLoader.classList.add('hidden');
-                    if (base64DataUrl) {
-                        document.getElementById('coord-canvas-subtitle').textContent = `Image ${imageIndex + 1}: ${description}`;
-                        loadCoordinateImage(base64DataUrl);
-                    } else {
-                        document.getElementById('coord-canvas-subtitle').textContent = 'Error loading image';
-                        onScriptRunFailure({ message: 'Server failed to load image data.' });
-                    }
-                })
-                .withFailureHandler((err) => {
-                    canvasLoader.classList.add('hidden');
-                    onScriptRunFailure(err);
-                })
-                .getImageAsBase64(imageUrl);
-        }
-
-        function initializeCoordinateHelper() {
-            if (coordHelperState.initialized) return;
-
-            landingPage.style.display = 'none';
-            simulationView.style.display = 'none';
-
-            const coordHelperView = document.getElementById('coordinate-helper-view');
-            coordHelperView.classList.remove('hidden');
-
-            const canvas = document.getElementById('coord-canvas');
-            coordHelperState.canvas = canvas;
-            coordHelperState.ctx = canvas.getContext('2d');
-
-            canvas.addEventListener('mousedown', handleCanvasMouseDown);
-            canvas.addEventListener('mousemove', handleCanvasMouseMove);
-            canvas.addEventListener('mouseup', handleCanvasMouseUp);
-
-            // Drawing mode buttons
-            const rectBtn = document.getElementById('draw-mode-rect');
-            const polyBtn = document.getElementById('draw-mode-poly');
-
-            rectBtn.classList.add('draw-mode-btn', 'active');
-            polyBtn.classList.add('draw-mode-btn');
-
-            rectBtn.addEventListener('click', () => {
-                coordHelperState.drawMode = 'rect';
-                rectBtn.classList.add('active');
-                polyBtn.classList.remove('active');
-                coordHelperState.currentPolygon = []; // Clear any partial polygon
-                redrawCanvas();
-            });
-
-            polyBtn.addEventListener('click', () => {
-                coordHelperState.drawMode = 'poly';
-                polyBtn.classList.add('active');
-                rectBtn.classList.remove('active');
-            });
-
-            coordHelperState.initialized = true;
-
-            google.script.run
-                .withSuccessHandler(buildCoordinateHelperLandingPage)
-                .withFailureHandler(onScriptRunFailure)
-                .getLessons();
-        }
-
-        function loadCoordinateImage(dataUrl) {
-            const img = new Image();
-            img.onload = () => {
-                coordHelperState.image = img;
-                const maxWidth = 768;
-                const aspectRatio = img.height / img.width;
-                coordHelperState.canvas.width = Math.min(img.width, maxWidth);
-                coordHelperState.canvas.height = coordHelperState.canvas.width * aspectRatio;
-                redrawCanvas();
-            };
-            img.onerror = () => onScriptRunFailure({ message: 'Failed to load image into canvas.'});
-            img.src = dataUrl;
-        }
-
-        function redrawCanvas() {
-            if (!coordHelperState.image) return;
-            const { ctx, canvas, image, zones, currentZone } = coordHelperState;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-            zones.forEach((zone, index) => drawZone(zone, index, false));
-            if (currentZone) drawZone(currentZone, zones.length, true);
-        }
-
-        function drawZone(zone, index, isTemporary) {
-            const { ctx, canvas } = coordHelperState;
-            const x = (zone.x / 100) * canvas.width;
-            const y = (zone.y / 100) * canvas.height;
-            const width = (zone.width / 100) * canvas.width;
-            const height = (zone.height / 100) * canvas.height;
-            ctx.strokeStyle = isTemporary ? '#fbbf24' : '#3b82f6';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(x, y, width, height);
-            ctx.fillStyle = isTemporary ? 'rgba(251, 191, 36, 0.2)' : 'rgba(59, 130, 246, 0.2)';
-            ctx.fillRect(x, y, width, height);
-            if (zone.label) {
-                ctx.fillStyle = '#000';
-                ctx.font = 'bold 14px Inter, sans-serif';
-                ctx.fillText(zone.label, x + 5, y + 20);
-            }
-        }
-
-        function handleCanvasMouseDown(e) {
-            if (!coordHelperState.image) return;
-
-            if (coordHelperState.drawMode === 'poly') {
-                handlePolygonClick(e, coordHelperState);
-                return;
-            }
-
-            const rect = coordHelperState.canvas.getBoundingClientRect();
-            const scaleX = coordHelperState.canvas.width / rect.width;
-            const scaleY = coordHelperState.canvas.height / rect.height;
-            const x = (e.clientX - rect.left) * scaleX;
-            const y = (e.clientY - rect.top) * scaleY;
-            coordHelperState.isDrawing = true;
-            coordHelperState.startX = x;
-            coordHelperState.startY = y;
-            coordHelperState.currentZone = null;
-        }
-
-
-        function handlePolygonClick(e, state) {
-            const rect = state.canvas.getBoundingClientRect();
-            const scaleX = state.canvas.width / rect.width;
-            const scaleY = state.canvas.height / rect.height;
-            const x = (e.clientX - rect.left) * scaleX;
-            const y = (e.clientY - rect.top) * scaleY;
-
-            const point = {
-                x: (x / state.canvas.width) * 100,
-                y: (y / state.canvas.height) * 100
-            };
-
-            if (state.currentPolygon.length > 0) {
-                const firstPoint = state.currentPolygon[0];
-                const firstPointCanvasX = (firstPoint.x / 100) * state.canvas.width;
-                const firstPointCanvasY = (firstPoint.y / 100) * state.canvas.height;
-                const distance = Math.sqrt(Math.pow(x - firstPointCanvasX, 2) + Math.pow(y - firstPointCanvasY, 2));
-
-                if (distance < 10) { // Close polygon
-                    const newZone = {
-                        type: 'poly',
-                        points: state.currentPolygon,
-                        label: ''
-                    };
-
-                    // Ask for label first
-                    showCustomModal({
-                        title: 'Enter Zone Label',
-                        message: 'Please provide an optional label for this zone.',
-                        type: 'prompt',
-                        placeholder: 'e.g., Nucleus'
-                    }).then(function(label) {
-                        if (label !== null) {
-                            if (label.trim() !== '') {
-                                newZone.label = label.trim();
-                            }
-
-                            // Then ask for target image (if lessonImages available)
-                            if (state.lessonImages && state.lessonImages.length > 0) {
-                                const imageOptions = [
-                                    { value: '', label: 'None (Sequential navigation)' },
-                                    { value: 'banner', label: '📝 Display Text Banner' },
-                                    ...state.lessonImages.map(img => ({
-                                        value: img.index.toString(),
-                                        label: `Image ${img.index + 1}: ${img.description}`
-                                    }))
-                                ];
-
-                                showCustomModal({
-                                    title: 'Select Action',
-                                    message: 'What should happen when this zone is clicked?',
-                                    type: 'select',
-                                    options: imageOptions
-                                }).then(function(targetView) {
-                                    if (targetView !== null) {
-                                        // Check if banner option was selected
-                                        if (targetView === 'banner') {
-                                            // Ask for banner text
-                                            showCustomModal({
-                                                title: 'Banner Text',
-                                                message: 'Enter the text to display in the banner:',
-                                                type: 'prompt',
-                                                placeholder: 'e.g., This is the mitochondria, the powerhouse of the cell!'
-                                            }).then(function(bannerText) {
-                                                if (bannerText !== null && bannerText.trim() !== '') {
-                                                    // Ask for banner position
-                                                    showCustomModal({
-                                                        title: 'Banner Position',
-                                                        message: 'Where should the banner appear?',
-                                                        type: 'select',
-                                                        options: [
-                                                            { value: 'top', label: 'Top of screen' },
-                                                            { value: 'bottom', label: 'Bottom of screen' }
-                                                        ]
-                                                    }).then(function(position) {
-                                                        if (position !== null) {
-                                                            newZone.actionType = 'banner';
-                                                            newZone.bannerText = bannerText.trim();
-                                                            newZone.bannerPosition = position;
-
-                                                            state.zones.push(newZone);
-                                                            state.currentPolygon = [];
-
-                                                            if (state === coordHelperState) {
-                                                                updateZonesList();
-                                                                updateJsonOutput();
-                                                                redrawCanvas();
-                                                            } else if (state === adminState) {
-                                                                updateAdminZonesList();
-                                                                redrawAdminCanvas();
-                                                            }
-                                                        } else {
-                                                            state.currentPolygon = [];
-                                                            if (state === coordHelperState) {
-                                                                redrawCanvas();
-                                                            } else if (state === adminState) {
-                                                                redrawAdminCanvas();
-                                                            }
-                                                        }
-                                                    });
-                                                } else {
-                                                    state.currentPolygon = [];
-                                                    if (state === coordHelperState) {
-                                                        redrawCanvas();
-                                                    } else if (state === adminState) {
-                                                        redrawAdminCanvas();
-                                                    }
-                                                }
-                                            });
-                                        }
-                                        // Add targetView only if a specific image was selected
-                                        else if (targetView !== '') {
-                                            newZone.targetView = parseInt(targetView);
-
-                                            state.zones.push(newZone);
-                                            state.currentPolygon = [];
-
-                                            if (state === coordHelperState) {
-                                                updateZonesList();
-                                                updateJsonOutput();
-                                                redrawCanvas();
-                                            } else if (state === adminState) {
-                                                updateAdminZonesList();
-                                                redrawAdminCanvas();
-                                            }
-                                        }
-                                        // Sequential navigation (no targetView)
-                                        else {
-                                            state.zones.push(newZone);
-                                            state.currentPolygon = [];
-
-                                            if (state === coordHelperState) {
-                                                updateZonesList();
-                                                updateJsonOutput();
-                                                redrawCanvas();
-                                            } else if (state === adminState) {
-                                                updateAdminZonesList();
-                                                redrawAdminCanvas();
-                                            }
-                                        }
-                                    } else {
-                                        state.currentPolygon = [];
-                                        if (state === coordHelperState) {
-                                            redrawCanvas();
-                                        } else if (state === adminState) {
-                                            redrawAdminCanvas();
-                                        }
-                                    }
-                                });
-                            } else {
-                                // No lessonImages available, just add the zone
-                                state.zones.push(newZone);
-                                state.currentPolygon = [];
-
-                                if (state === coordHelperState) {
-                                    updateZonesList();
-                                    updateJsonOutput();
-                                    redrawCanvas();
-                                } else if (state === adminState) {
-                                    updateAdminZonesList();
-                                    redrawAdminCanvas();
-                                }
-                            }
-                        } else {
-                            // User cancelled, clear polygon
-                            state.currentPolygon = [];
-                            if (state === coordHelperState) {
-                                redrawCanvas();
-                            } else if (state === adminState) {
-                                redrawAdminCanvas();
-                            }
-                        }
-                    });
-                    return;
-                }
-            }
-
-            state.currentPolygon.push(point);
-            if (state === coordHelperState) {
-                redrawCanvas();
-            } else if (state === adminState) {
-                redrawAdminCanvas();
-            }
-        }
-
-        function handleCanvasMouseMove(e) {
-            if (coordHelperState.drawMode === 'poly' || !coordHelperState.isDrawing || !coordHelperState.image) return;
-            const rect = coordHelperState.canvas.getBoundingClientRect();
-            const scaleX = coordHelperState.canvas.width / rect.width;
-            const scaleY = coordHelperState.canvas.height / rect.height;
-            const currentX = (e.clientX - rect.left) * scaleX;
-            const currentY = (e.clientY - rect.top) * scaleY;
-            const x = Math.min(coordHelperState.startX, currentX);
-            const y = Math.min(coordHelperState.startY, currentY);
-            const width = Math.abs(currentX - coordHelperState.startX);
-            const height = Math.abs(currentY - coordHelperState.startY);
-            coordHelperState.currentZone = {
-                type: 'rect',
-                x: (x / coordHelperState.canvas.width) * 100,
-                y: (y / coordHelperState.canvas.height) * 100,
-                width: (width / coordHelperState.canvas.width) * 100,
-                height: (height / coordHelperState.canvas.height) * 100,
-                label: ''
-            };
-            redrawCanvas();
-        }
-
-        function handleCanvasMouseUp(e) {
-            if (coordHelperState.drawMode === 'poly' || !coordHelperState.isDrawing || !coordHelperState.image) return;
-            coordHelperState.isDrawing = false;
-
-            if (coordHelperState.currentZone && coordHelperState.currentZone.width > 1 && coordHelperState.currentZone.height > 1) {
-                // First ask for label
-                showCustomModal({
-                    title: 'Enter Zone Label',
-                    message: 'Please provide an optional label for this zone.',
-                    type: 'prompt',
-                    placeholder: 'e.g., Nucleus'
-                }).then(function(label) {
-                    if(label !== null) { // Only proceed if user didn't cancel
-                        // Trim and validate label
-                        const trimmedLabel = label.trim();
-                        console.log('Zone label entered:', label, '| Trimmed:', trimmedLabel);
-
-                        // Only set label if non-empty, otherwise leave undefined for default fallback
-                        if (trimmedLabel !== '') {
-                            coordHelperState.currentZone.label = trimmedLabel;
-                        }
-
-                        // Then ask for target image
-                        const imageOptions = [
-                            { value: '', label: 'None (Sequential navigation)' },
-                            { value: 'banner', label: '📝 Display Text Banner' },
-                            ...coordHelperState.lessonImages.map(img => ({
-                                value: img.index.toString(),
-                                label: `Image ${img.index + 1}: ${img.description}`
-                            }))
-                        ];
-
-                        showCustomModal({
-                            title: 'Select Action',
-                            message: 'What should happen when this zone is clicked?',
-                            type: 'select',
-                            options: imageOptions
-                        }).then(function(targetView) {
-                            if (targetView !== null) {
-                                // Check if banner option was selected
-                                if (targetView === 'banner') {
-                                    // Ask for banner text
-                                    showCustomModal({
-                                        title: 'Banner Text',
-                                        message: 'Enter the text to display in the banner:',
-                                        type: 'prompt',
-                                        placeholder: 'e.g., This is the mitochondria, the powerhouse of the cell!'
-                                    }).then(function(bannerText) {
-                                        if (bannerText !== null && bannerText.trim() !== '') {
-                                            // Ask for banner position
-                                            showCustomModal({
-                                                title: 'Banner Position',
-                                                message: 'Where should the banner appear?',
-                                                type: 'select',
-                                                options: [
-                                                    { value: 'top', label: 'Top of screen' },
-                                                    { value: 'bottom', label: 'Bottom of screen' }
-                                                ]
-                                            }).then(function(position) {
-                                                if (position !== null) {
-                                                    coordHelperState.currentZone.actionType = 'banner';
-                                                    coordHelperState.currentZone.bannerText = bannerText.trim();
-                                                    coordHelperState.currentZone.bannerPosition = position;
-
-                                                    coordHelperState.currentZone.x = Math.round(coordHelperState.currentZone.x * 100) / 100;
-                                                    coordHelperState.currentZone.y = Math.round(coordHelperState.currentZone.y * 100) / 100;
-                                                    coordHelperState.currentZone.width = Math.round(coordHelperState.currentZone.width * 100) / 100;
-                                                    coordHelperState.currentZone.height = Math.round(coordHelperState.currentZone.height * 100) / 100;
-
-                                                    console.log('Adding banner zone to array:', coordHelperState.currentZone);
-                                                    coordHelperState.zones.push(coordHelperState.currentZone);
-                                                    console.log('Total zones:', coordHelperState.zones.length);
-
-                                                    updateZonesList();
-                                                    updateJsonOutput();
-                                                }
-                                                coordHelperState.currentZone = null;
-                                                redrawCanvas();
-                                            });
-                                        } else {
-                                            coordHelperState.currentZone = null;
-                                            redrawCanvas();
-                                        }
-                                    });
-                                }
-                                // Add targetView only if a specific image was selected
-                                else if (targetView !== '') {
-                                    coordHelperState.currentZone.targetView = parseInt(targetView);
-
-                                    coordHelperState.currentZone.x = Math.round(coordHelperState.currentZone.x * 100) / 100;
-                                    coordHelperState.currentZone.y = Math.round(coordHelperState.currentZone.y * 100) / 100;
-                                    coordHelperState.currentZone.width = Math.round(coordHelperState.currentZone.width * 100) / 100;
-                                    coordHelperState.currentZone.height = Math.round(coordHelperState.currentZone.height * 100) / 100;
-
-                                    console.log('Adding zone to array:', coordHelperState.currentZone);
-                                    coordHelperState.zones.push(coordHelperState.currentZone);
-                                    console.log('Total zones:', coordHelperState.zones.length, '| All zones:', coordHelperState.zones);
-
-                                    updateZonesList();
-                                    updateJsonOutput();
-
-                                    coordHelperState.currentZone = null;
-                                    redrawCanvas();
-                                }
-                                // Sequential navigation (no targetView)
-                                else {
-                                    coordHelperState.currentZone.x = Math.round(coordHelperState.currentZone.x * 100) / 100;
-                                    coordHelperState.currentZone.y = Math.round(coordHelperState.currentZone.y * 100) / 100;
-                                    coordHelperState.currentZone.width = Math.round(coordHelperState.currentZone.width * 100) / 100;
-                                    coordHelperState.currentZone.height = Math.round(coordHelperState.currentZone.height * 100) / 100;
-
-                                    console.log('Adding zone to array:', coordHelperState.currentZone);
-                                    coordHelperState.zones.push(coordHelperState.currentZone);
-                                    console.log('Total zones:', coordHelperState.zones.length, '| All zones:', coordHelperState.zones);
-
-                                    updateZonesList();
-                                    updateJsonOutput();
-
-                                    coordHelperState.currentZone = null;
-                                    redrawCanvas();
-                                }
-                            } else {
-                                coordHelperState.currentZone = null;
-                                redrawCanvas();
-                            }
-                        });
-                    } else {
-                        coordHelperState.currentZone = null;
-                        redrawCanvas();
-                    }
-                });
-            } else {
-                coordHelperState.currentZone = null;
-                redrawCanvas();
-            }
-        }
-
-        function updateZonesList() {
-            const zonesList = document.getElementById('zones-list');
-            if (coordHelperState.zones.length === 0) {
-                zonesList.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">No zones defined yet. Click and drag on the image to create zones.</p>';
-                return;
-            }
-            zonesList.innerHTML = coordHelperState.zones.map((zone, index) => {
-                let targetInfo = '';
-                if (zone.actionType === 'banner') {
-                    const preview = zone.bannerText.length > 50 ? zone.bannerText.substring(0, 50) + '...' : zone.bannerText;
-                    targetInfo = `<br>→ Banner (${zone.bannerPosition}): "${preview}"`;
-                } else if (zone.targetView !== undefined && zone.targetView !== null) {
-                    const targetImage = coordHelperState.lessonImages.find(img => img.index === zone.targetView);
-                    targetInfo = targetImage
-                        ? `<br>→ Target: Image ${zone.targetView + 1} (${targetImage.description})`
-                        : `<br>→ Target: Image ${zone.targetView + 1}`;
-                }
-
-                let zoneDetails = '';
-                if (zone.type === 'poly') {
-                    zoneDetails = `Polygon with ${zone.points.length} points`;
-                } else {
-                    zoneDetails = `x: ${zone.x}%, y: ${zone.y}%<br>w: ${zone.width}%, h: ${zone.height}%`;
-                }
-
-                return `
-                <div class="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg flex justify-between items-start">
-                    <div class="flex-1">
-                        <div class="font-semibold text-sm">${zone.label || `Zone ${index + 1}`}</div>
-                        <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                            ${zoneDetails}${targetInfo}
-                        </div>
-                    </div>
-                    <div class="flex gap-1 ml-2">
-                        <button onclick="editZone(${index})" class="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">
-                            Edit
-                        </button>
-                        <button onclick="deleteZone(${index})" class="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600">
-                            Delete
-                        </button>
-                    </div>
-                </div>
-                `;
-            }).join('');
-        }
-        
-        document.getElementById('clear-zones').addEventListener('click', () => {
-            coordHelperState.zones = [];
-            coordHelperState.currentPolygon = [];
-            updateZonesList();
-            updateJsonOutput();
-            redrawCanvas();
-        });
-        
-        function createZoneOverlays(zones) {
-            zonesOverlay.innerHTML = ''; // Clear existing zones
-
-            console.log('createZoneOverlays called with zones:', zones);
-
-            if (!zones || zones.length === 0) {
-                console.log('No zones to create');
-                simulationContainer.classList.remove('has-zones');
-                return;
-            }
-
-            simulationContainer.classList.add('has-zones');
-            console.log(`Creating ${zones.length} zone overlays`);
-
-            // Get the actual dimensions of the container and the image
-            const containerRect = simulationContainer.getBoundingClientRect();
-            const imageRect = mainImage.getBoundingClientRect();
-
-            // Calculate the offset and scale of the image within the container
-            // (due to object-contain, the image might be smaller and centered)
-            const offsetX = imageRect.left - containerRect.left;
-            const offsetY = imageRect.top - containerRect.top;
-            const imageWidth = imageRect.width;
-            const imageHeight = imageRect.height;
-            const containerWidth = containerRect.width;
-            const containerHeight = containerRect.height;
-
-            console.log('Container dimensions:', containerWidth, 'x', containerHeight);
-            console.log('Image dimensions:', imageWidth, 'x', imageHeight);
-            console.log('Image offset:', offsetX, ',', offsetY);
-
-            zones.forEach((zone, index) => {
-                console.log(`Zone ${index}:`, zone);
-
-                if (zone.type === 'poly') {
-                    const svgNS = "http://www.w3.org/2000/svg";
-                    const svg = document.createElementNS(svgNS, "svg");
-                    svg.setAttribute('class', 'polygon-zone');
-                    svg.style.width = '100%';
-                    svg.style.height = '100%';
-                    svg.style.position = 'absolute';
-                    svg.style.left = '0';
-                    svg.style.top = '0';
-                    svg.style.pointerEvents = 'none';
-
-                    const polygon = document.createElementNS(svgNS, "polygon");
-                    // Convert polygon points from image-relative percentages to container-relative pixels
-                    const points = zone.points.map(p => {
-                        // Step 1: Convert percentage to pixels relative to image
-                        const pxInImage = (p.x / 100) * imageWidth;
-                        const pyInImage = (p.y / 100) * imageHeight;
-                        // Step 2: Add image offset within container
-                        const pxInContainer = pxInImage + offsetX;
-                        const pyInContainer = pyInImage + offsetY;
-                        return `${pxInContainer},${pyInContainer}`;
-                    }).join(' ');
-                    polygon.setAttribute("points", points);
-                    polygon.setAttribute("class", "polygon-shape");
-                    polygon.style.fill = 'transparent';
-                    polygon.style.stroke = 'transparent';
-                    polygon.style.strokeWidth = '2px';
-                    polygon.style.pointerEvents = 'all';
-                    polygon.style.cursor = 'pointer';
-                    polygon.style.transition = 'fill 0.3s ease, stroke 0.3s ease';
-
-                    // Add hover effect inline since CSS :hover doesn't work well with SVG in some browsers
-                    polygon.addEventListener('mouseenter', () => {
-                        polygon.style.fill = 'rgba(59, 130, 246, 0.2)';
-                        polygon.style.stroke = 'rgba(59, 130, 246, 0.5)';
-                        // Show label
-                        const label = svg.querySelector('.zone-label');
-                        if (label) {
-                            label.style.opacity = '1';
-                            label.style.transform = 'translateX(-50%) translateY(-12px)';
-                        }
-                    });
-                    polygon.addEventListener('mouseleave', () => {
-                        polygon.style.fill = 'transparent';
-                        polygon.style.stroke = 'transparent';
-                        // Hide label
-                        const label = svg.querySelector('.zone-label');
-                        if (label) {
-                            label.style.opacity = '0';
-                            label.style.transform = 'translateX(-50%) translateY(-8px)';
-                        }
-                    });
-
-                    // Add click handler for polygon zone
-                    polygon.addEventListener('click', (e) => {
-                        console.log(`Zone ${index} clicked!`);
-                        e.stopPropagation();
-
-                        // Check if zone displays a banner
-                        if (zone.actionType === 'banner' && zone.bannerText) {
-                            const position = zone.bannerPosition || 'bottom';
-                            showZoneBanner(zone.bannerText, position);
-                        }
-                        // Check if zone has a specific target view
-                        else if (zone.targetView !== undefined && zone.targetView !== null) {
-                            const targetIndex = parseInt(zone.targetView);
-                            if (targetIndex >= 0 && targetIndex < currentLessonViews.length) {
-                                navigateToView(targetIndex);
-                            } else {
-                                console.error(`Invalid targetView ${targetIndex} for zone ${index}`);
-                                zoomToNextView(); // Fallback to sequential navigation
-                            }
-                        } else {
-                            // Default behavior: advance to next view sequentially
-                            zoomToNextView();
-                        }
-                    });
-
-                    svg.appendChild(polygon);
-
-                    // Add label tooltip
-                    const label = document.createElement('div');
-                    label.className = 'zone-label';
-                    label.textContent = zone.label || `Zone ${index + 1}`;
-                    // Position label at the center of the polygon
-                    const avgX = zone.points.reduce((sum, p) => sum + p.x, 0) / zone.points.length;
-                    const avgY = zone.points.reduce((sum, p) => sum + p.y, 0) / zone.points.length;
-                    const labelX = (avgX / 100) * imageWidth + offsetX;
-                    const labelY = (avgY / 100) * imageHeight + offsetY;
-                    label.style.position = 'absolute';
-                    label.style.left = `${labelX}px`;
-                    label.style.top = `${labelY}px`;
-                    svg.appendChild(label);
-
-                    zonesOverlay.appendChild(svg);
-
-                } else { // rect
-                    const zoneDiv = document.createElement('div');
-                    zoneDiv.className = 'clickable-zone';
-
-                    // Calculate zone position relative to the actual image, not the container
-                    // Zone percentages are relative to the image, so we need to:
-                    // 1. Convert percentages to pixels relative to the image
-                    // 2. Add the image offset within the container
-                    // 3. Convert back to percentages relative to the container
-                    const zoneLeftPx = (zone.x / 100) * imageWidth + offsetX;
-                    const zoneTopPx = (zone.y / 100) * imageHeight + offsetY;
-                    const zoneWidthPx = (zone.width / 100) * imageWidth;
-                    const zoneHeightPx = (zone.height / 100) * imageHeight;
-
-                    // Convert to percentages of the container
-                    const zoneLeftPercent = (zoneLeftPx / containerWidth) * 100;
-                    const zoneTopPercent = (zoneTopPx / containerHeight) * 100;
-                    const zoneWidthPercent = (zoneWidthPx / containerWidth) * 100;
-                    const zoneHeightPercent = (zoneHeightPx / containerHeight) * 100;
-
-                    zoneDiv.style.left = `${zoneLeftPercent}%`;
-                    zoneDiv.style.top = `${zoneTopPercent}%`;
-                    zoneDiv.style.width = `${zoneWidthPercent}%`;
-                    zoneDiv.style.height = `${zoneHeightPercent}%`;
-
-                    console.log(`Zone ${index} positioned at: left=${zoneLeftPercent.toFixed(2)}%, top=${zoneTopPercent.toFixed(2)}%, width=${zoneWidthPercent.toFixed(2)}%, height=${zoneHeightPercent.toFixed(2)}%`);
-
-                    // Add label tooltip
-                    const label = document.createElement('div');
-                    label.className = 'zone-label';
-                    label.textContent = zone.label || `Zone ${index + 1}`;
-                    zoneDiv.appendChild(label);
-                    zonesOverlay.appendChild(zoneDiv);
-
-                    // Add click handler for rectangular zone
-                    zoneDiv.addEventListener('click', (e) => {
-                        console.log(`Zone ${index} clicked!`);
-                        e.stopPropagation();
-
-                        // Check if zone displays a banner
-                        if (zone.actionType === 'banner' && zone.bannerText) {
-                            const position = zone.bannerPosition || 'bottom';
-                            showZoneBanner(zone.bannerText, position);
-                        }
-                        // Check if zone has a specific target view
-                        else if (zone.targetView !== undefined && zone.targetView !== null) {
-                            const targetIndex = parseInt(zone.targetView);
-                            if (targetIndex >= 0 && targetIndex < currentLessonViews.length) {
-                                navigateToView(targetIndex);
-                            } else {
-                                console.error(`Invalid targetView ${targetIndex} for zone ${index}`);
-                                zoomToNextView(); // Fallback to sequential navigation
-                            }
-                        } else {
-                            // Default behavior: advance to next view sequentially
-                            zoomToNextView();
-                        }
-                    });
-                }
-
-            });
-        }
-
-        function editZone(index) {
-            const zone = coordHelperState.zones[index];
-            if (!zone) return;
-
-            // Prepare image options for the action dropdown
-            const imageOptions = [
-                { value: '', label: 'None (Sequential navigation)' },
-                { value: 'banner', label: '📝 Display Text Banner' },
-                ...coordHelperState.lessonImages.map(img => ({
-                    value: img.index.toString(),
-                    label: `Image ${img.index + 1}: ${img.description}`
-                }))
-            ];
-
-            // Determine current action value
-            let currentAction = '';
-            if (zone.actionType === 'banner') {
-                currentAction = 'banner';
-            } else if (zone.targetView !== undefined) {
-                currentAction = zone.targetView.toString();
-            }
-
-            // First modal: Label + Action selection
-            showCustomModal({
-                title: 'Edit Zone',
-                message: 'Update the zone label and click action:',
-                type: 'multi',
-                fields: [
-                    {
-                        type: 'text',
-                        id: 'label',
-                        label: 'Zone Label',
-                        placeholder: zone.label || `Zone ${index + 1}`,
-                        value: zone.label || ''
-                    },
-                    {
-                        type: 'select',
-                        id: 'action',
-                        label: 'Click Action',
-                        value: currentAction,
-                        options: imageOptions
-                    }
-                ]
-            }).then(function(values) {
-                if (values !== null) {
-                    const newLabel = values.label.trim();
-                    const selectedAction = values.action;
-
-                    // Update label
-                    if (newLabel !== '') {
-                        coordHelperState.zones[index].label = newLabel;
-                    } else {
-                        delete coordHelperState.zones[index].label;
-                    }
-
-                    // Handle banner action
-                    if (selectedAction === 'banner') {
-                        // Second modal: Banner text + position
-                        showCustomModal({
-                            title: 'Configure Text Banner',
-                            message: 'Enter the banner text and position:',
-                            type: 'multi',
-                            fields: [
-                                {
-                                    type: 'text',
-                                    id: 'bannerText',
-                                    label: 'Banner Text',
-                                    placeholder: 'e.g., This is the mitochondria, the powerhouse of the cell!',
-                                    value: zone.bannerText || ''
-                                },
-                                {
-                                    type: 'select',
-                                    id: 'bannerPosition',
-                                    label: 'Banner Position',
-                                    value: zone.bannerPosition || 'bottom',
-                                    options: [
-                                        { value: 'top', label: 'Top of screen' },
-                                        { value: 'bottom', label: 'Bottom of screen' }
-                                    ]
-                                }
-                            ]
-                        }).then(function(bannerValues) {
-                            if (bannerValues !== null && bannerValues.bannerText.trim() !== '') {
-                                // Remove old properties
-                                delete coordHelperState.zones[index].targetView;
-                                // Set banner properties
-                                coordHelperState.zones[index].actionType = 'banner';
-                                coordHelperState.zones[index].bannerText = bannerValues.bannerText.trim();
-                                coordHelperState.zones[index].bannerPosition = bannerValues.bannerPosition;
-
-                                console.log('Zone edited:', coordHelperState.zones[index]);
-                                updateZonesList();
-                                updateJsonOutput();
-                                redrawCanvas();
-                            }
-                        });
-                    }
-                    // Handle image navigation
-                    else if (selectedAction !== '') {
-                        // Remove old banner properties
-                        delete coordHelperState.zones[index].actionType;
-                        delete coordHelperState.zones[index].bannerText;
-                        delete coordHelperState.zones[index].bannerPosition;
-                        // Set target view
-                        coordHelperState.zones[index].targetView = parseInt(selectedAction);
-
-                        console.log('Zone edited:', coordHelperState.zones[index]);
-                        updateZonesList();
-                        updateJsonOutput();
-                        redrawCanvas();
-                    }
-                    // Handle sequential navigation (no action)
-                    else {
-                        // Remove all action properties
-                        delete coordHelperState.zones[index].targetView;
-                        delete coordHelperState.zones[index].actionType;
-                        delete coordHelperState.zones[index].bannerText;
-                        delete coordHelperState.zones[index].bannerPosition;
-
-                        console.log('Zone edited:', coordHelperState.zones[index]);
-                        updateZonesList();
-                        updateJsonOutput();
-                        redrawCanvas();
-                    }
-                }
-            });
-        }
-        window.editZone = editZone;
-
-        function deleteZone(index) {
-            coordHelperState.zones.splice(index, 1);
-            updateZonesList();
-            updateJsonOutput();
-            redrawCanvas();
-        }
-        window.deleteZone = deleteZone;
-
-        function updateJsonOutput() {
-            const zonesArrayOutput = document.getElementById('json-zones-array');
-            const fullMetadataOutput = document.getElementById('json-full-metadata');
-            zonesArrayOutput.value = JSON.stringify(coordHelperState.zones, null, 2);
-            if (coordHelperState.currentLesson !== null) {
-                const outputWithMetadata = {
-                    lessonName: coordHelperState.currentLesson,
-                    imageIndex: coordHelperState.currentImageIndex,
-                    imageDescription: coordHelperState.currentImageDesc,
-                    zones: coordHelperState.zones
-                };
-                fullMetadataOutput.value = JSON.stringify(outputWithMetadata, null, 2);
-            } else {
-                fullMetadataOutput.value = JSON.stringify({ zones: coordHelperState.zones }, null, 2);
-            }
-        }
         
         // ==============================
         // ADMIN LESSON MANAGEMENT
@@ -2517,7 +1534,6 @@
             // Hide all views
             landingPage.style.display = 'none';
             simulationView.style.display = 'none';
-            document.getElementById('coordinate-helper-view').classList.add('hidden');
             document.getElementById('admin-view').classList.remove('hidden');
 
             // Show lesson list sub-view, hide others
@@ -3117,34 +2133,144 @@
         }
 
         /**
-         * Draws a zone on the admin canvas
+         * Handles polygon drawing for admin canvas.
+         * Click to add points, click near first point to close the polygon.
          */
-        function drawAdminZone(zone, index, isTemporary) {
-            const { ctx, canvas } = adminState;
+        function handlePolygonClick(e, state) {
+            const rect = state.canvas.getBoundingClientRect();
+            const scaleX = state.canvas.width / rect.width;
+            const scaleY = state.canvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
 
-            const x = (zone.x / 100) * canvas.width;
-            const y = (zone.y / 100) * canvas.height;
-            const width = (zone.width / 100) * canvas.width;
-            const height = (zone.height / 100) * canvas.height;
+            const point = {
+                x: (x / state.canvas.width) * 100,
+                y: (y / state.canvas.height) * 100
+            };
 
-            ctx.strokeStyle = isTemporary ? '#fbbf24' : '#3b82f6';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(x, y, width, height);
+            if (state.currentPolygon.length > 0) {
+                const firstPoint = state.currentPolygon[0];
+                const firstPointCanvasX = (firstPoint.x / 100) * state.canvas.width;
+                const firstPointCanvasY = (firstPoint.y / 100) * state.canvas.height;
+                const distance = Math.sqrt(Math.pow(x - firstPointCanvasX, 2) + Math.pow(y - firstPointCanvasY, 2));
 
-            ctx.fillStyle = isTemporary ? 'rgba(251, 191, 36, 0.2)' : 'rgba(59, 130, 246, 0.2)';
-            ctx.fillRect(x, y, width, height);
+                if (distance < 10) { // Close polygon
+                    const newZone = {
+                        type: 'poly',
+                        points: state.currentPolygon,
+                        label: ''
+                    };
 
-            if (zone.label) {
-                ctx.fillStyle = '#000';
-                ctx.font = 'bold 14px Inter, sans-serif';
-                ctx.fillText(zone.label, x + 5, y + 20);
+                    // Ask for label first
+                    showCustomModal({
+                        title: 'Enter Zone Label',
+                        message: 'Please provide an optional label for this zone.',
+                        type: 'prompt',
+                        placeholder: 'e.g., Nucleus'
+                    }).then(function(label) {
+                        if (label !== null) {
+                            if (label.trim() !== '') {
+                                newZone.label = label.trim();
+                            }
+
+                            // Then ask for target image (if lessonImages available)
+                            if (state.lessonImages && state.lessonImages.length > 0) {
+                                const imageOptions = [
+                                    { value: '', label: 'None (Sequential navigation)' },
+                                    { value: 'banner', label: '📝 Display Text Banner' },
+                                    ...state.lessonImages.map(img => ({
+                                        value: img.index.toString(),
+                                        label: `Image ${img.index + 1}: ${img.description}`
+                                    }))
+                                ];
+
+                                showCustomModal({
+                                    title: 'Select Action',
+                                    message: 'What should happen when this zone is clicked?',
+                                    type: 'select',
+                                    options: imageOptions
+                                }).then(function(targetView) {
+                                    if (targetView !== null) {
+                                        // Check if banner option was selected
+                                        if (targetView === 'banner') {
+                                            // Ask for banner text
+                                            showCustomModal({
+                                                title: 'Banner Text',
+                                                message: 'Enter the text to display in the banner:',
+                                                type: 'prompt',
+                                                placeholder: 'e.g., This is the mitochondria, the powerhouse of the cell!'
+                                            }).then(function(bannerText) {
+                                                if (bannerText !== null && bannerText.trim() !== '') {
+                                                    // Ask for banner position
+                                                    showCustomModal({
+                                                        title: 'Banner Position',
+                                                        message: 'Where should the banner appear?',
+                                                        type: 'select',
+                                                        options: [
+                                                            { value: 'top', label: 'Top of screen' },
+                                                            { value: 'bottom', label: 'Bottom of screen' }
+                                                        ]
+                                                    }).then(function(position) {
+                                                        if (position !== null) {
+                                                            newZone.actionType = 'banner';
+                                                            newZone.bannerText = bannerText.trim();
+                                                            newZone.bannerPosition = position;
+
+                                                            state.zones.push(newZone);
+                                                            state.currentPolygon = [];
+                                                            updateAdminZonesList();
+                                                            redrawAdminCanvas();
+                                                        } else {
+                                                            state.currentPolygon = [];
+                                                            redrawAdminCanvas();
+                                                        }
+                                                    });
+                                                } else {
+                                                    state.currentPolygon = [];
+                                                    redrawAdminCanvas();
+                                                }
+                                            });
+                                        }
+                                        // Add targetView only if a specific image was selected
+                                        else if (targetView !== '') {
+                                            newZone.targetView = parseInt(targetView);
+                                            state.zones.push(newZone);
+                                            state.currentPolygon = [];
+                                            updateAdminZonesList();
+                                            redrawAdminCanvas();
+                                        }
+                                        // Sequential navigation (no targetView)
+                                        else {
+                                            state.zones.push(newZone);
+                                            state.currentPolygon = [];
+                                            updateAdminZonesList();
+                                            redrawAdminCanvas();
+                                        }
+                                    } else {
+                                        state.currentPolygon = [];
+                                        redrawAdminCanvas();
+                                    }
+                                });
+                            } else {
+                                // No lessonImages available, just add the zone
+                                state.zones.push(newZone);
+                                state.currentPolygon = [];
+                                updateAdminZonesList();
+                                redrawAdminCanvas();
+                            }
+                        } else {
+                            // User cancelled, clear polygon
+                            state.currentPolygon = [];
+                            redrawAdminCanvas();
+                        }
+                    });
+                    return;
+                }
             }
+
+            state.currentPolygon.push(point);
+            redrawAdminCanvas();
         }
-
-        /**
-         * Admin canvas mouse down handler
-         */
-
 
         /**
          * Updates the admin zones list
@@ -3843,46 +2969,6 @@
                 document.getElementById('admin-save-zones-btn')?.addEventListener('click', saveAdminZones);
                 document.getElementById('admin-back-to-images')?.addEventListener('click', () => {
                     showImageManager(adminState.currentLessonTitle);
-                });
-
-                // Coordinate Helper buttons
-                document.getElementById('coord-back-to-lessons')?.addEventListener('click', () => {
-                    document.getElementById('coord-image-selection').classList.add('hidden');
-                    document.getElementById('coord-lesson-selection').classList.remove('hidden');
-                });
-                document.getElementById('coord-back-to-images')?.addEventListener('click', () => {
-                    document.getElementById('coord-canvas-editor').classList.add('hidden');
-                    document.getElementById('coord-image-selection').classList.remove('hidden');
-                });
-                document.getElementById('coord-back-to-lessons-from-canvas')?.addEventListener('click', () => {
-                    document.getElementById('coord-canvas-editor').classList.add('hidden');
-                    document.getElementById('coord-lesson-selection').classList.remove('hidden');
-                });
-                document.getElementById('copy-zones-array').addEventListener('click', (e) => {
-                    const btn = e.target;
-                    const originalText = btn.textContent;
-                    document.getElementById('json-zones-array').select();
-                    document.execCommand('copy');
-                    btn.textContent = '✓ Copied!';
-                    setTimeout(() => { btn.textContent = originalText; }, 2000);
-                });
-                document.getElementById('copy-full-metadata').addEventListener('click', (e) => {
-                     const btn = e.target;
-                    const originalText = btn.textContent;
-                    document.getElementById('json-full-metadata').select();
-                    document.execCommand('copy');
-                    btn.textContent = '✓ Copied!';
-                    setTimeout(() => { btn.textContent = originalText; }, 2000);
-                });
-                document.getElementById('clear-zones').addEventListener('click', function() {
-                    showCustomModal({ title: 'Confirm Clear', message: 'Are you sure you want to clear all zones?', type: 'confirm'}).then(function(confirmed) {
-                        if(confirmed) {
-                            coordHelperState.zones = [];
-                            redrawCanvas();
-                            updateZonesList();
-                            updateJsonOutput();
-                        }
-                    });
                 });
 
             } catch (error) {

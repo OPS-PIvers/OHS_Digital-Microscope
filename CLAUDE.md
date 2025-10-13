@@ -36,8 +36,8 @@ const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxqRzx8nvXNquuPVw_n
   - Google Drive integration
   - Admin authentication
   - URL conversion utilities
-- **Index.html** - Complete frontend (HTML/CSS/JS, 37k+ tokens)
-  - Four main views: Landing, Simulation, Coordinate Helper, Admin
+- **Index.html** - Complete frontend (HTML/CSS/JS, ~2850 lines)
+  - Three main views: Landing, Simulation, Admin
   - Tailwind CSS styling
   - Client-side JavaScript for UI interactions
 - **appsscript.json** - Apps Script configuration (V8 runtime, Drive/Sheets APIs)
@@ -73,7 +73,7 @@ zonesColumn = baseColumn + 2       // Zones JSON
 **Data Retrieval:**
 - `getLessons()` - Returns all lessons for landing page (columns A, B, D)
 - `getLessonData(lessonName)` - Returns all images/zones for simulation view
-- `getLessonDataForCoordinates(lessonName)` - Returns images for coordinate helper
+- `getLessonDataForCoordinates(lessonName)` - Returns images for admin zone editor (legacy function name, still used by admin)
 - `getLessonForEditing(lessonName)` - Returns full lesson data for admin editing
 
 **Lesson Management:**
@@ -101,15 +101,14 @@ zonesColumn = baseColumn + 2       // Zones JSON
 
 ### Frontend Architecture (Index.html)
 
-**Four Main Views:**
+**Three Main Views:**
 1. **Landing Page (View 1)** - Lesson selection cards with previews
 2. **Simulation (View 2)** - Student microscope experience with zoom, focus slider, clickable zones
-3. **Coordinate Helper (View 3)** - Tool for creating zone coordinates via drag-to-create rectangles
-4. **Admin (View 4)** - Teacher interface with sub-views:
+3. **Admin (View 3)** - Teacher interface with sub-views:
    - Lesson list (view/edit/delete)
    - Create/edit form (title & description)
    - Image manager (upload via file picker or Ctrl+V paste)
-   - Zone editor (drag-to-create zones with labels)
+   - Zone editor (drag-to-create rectangles or polygons with labels and actions)
 
 **Key Frontend Patterns:**
 - Views are shown/hidden by toggling `hidden` class
@@ -171,7 +170,7 @@ const ROOT_FOLDER_ID = '1L69YbBWOi7AM_LrB5A1ENTy-AJHoTTRf';
 If changing column layout, update these functions:
 - `getLessons()` - Landing page data
 - `getLessonData()` - Simulation view data
-- `getLessonDataForCoordinates()` - Coordinate helper data
+- `getLessonDataForCoordinates()` - Admin zone editor data (legacy function name)
 - `updateLessonImage()` - Column index calculations
 - `getLessonForEditing()` - Admin edit view
 - All image management functions (delete, replace, etc.)

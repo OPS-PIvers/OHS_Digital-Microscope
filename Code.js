@@ -7,13 +7,12 @@ const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxqRzx8nvXNquuPVw_n
 
 /**
  * Creates a custom menu when the spreadsheet opens.
- * This menu provides quick access to the web app and coordinate helper tool.
+ * This menu provides quick access to the web app.
  */
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('🔬 Anatomy Lab')
     .addItem('📱 Open Live Web App', 'openWebApp')
-    .addItem('📍 Open Coordinate Helper', 'openCoordinateHelper')
     .addSeparator()
     .addItem('ℹ️ Get Web App URL', 'showWebAppUrl')
     .addToUi();
@@ -31,17 +30,6 @@ function openWebApp() {
   );
 }
 
-/**
- * Opens the web app with coordinate helper mode enabled.
- */
-function openCoordinateHelper() {
-  const url = WEB_APP_URL + '?tool=coordinates';
-  const html = `<script>window.open('${url}', '_blank');google.script.host.close();</script>`;
-  SpreadsheetApp.getUi().showModalDialog(
-    HtmlService.createHtmlOutput(html).setWidth(100).setHeight(50),
-    'Opening Coordinate Helper...'
-  );
-}
 
 /**
  * Displays the web app URL in a dialog for easy copying.
@@ -66,11 +54,8 @@ function showWebAppUrl() {
 /**
  * Serves the main HTML page of the web app.
  * This is the primary function that runs when the web app URL is visited.
- * Reads the 'tool' parameter to determine which mode to load (e.g., ?tool=coordinates)
  */
 function doGet(e) {
-  // Serve the HTML page
-  // Tool mode is parsed from URL query parameter directly in the client-side JavaScript
   return HtmlService.createHtmlOutputFromFile('Index.html')
     .setTitle('Interactive Anatomy Lab');
 }
