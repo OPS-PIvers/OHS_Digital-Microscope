@@ -312,6 +312,7 @@
             flex: 1;
             font-size: 16px;
             line-height: 1.5;
+            text-align: center;
         }
         #zone-banner-close {
             background: rgba(255, 255, 255, 0.2);
@@ -884,6 +885,7 @@
         let viewHistory = []; // Stack to track navigation history for back button
         let awaitingFocusAdjustment = false;
         let optimalFocusValue = 50; // The "correct" slider position for sharp focus
+        let bannerAutoHideTimer = null; // Timer ID for auto-hiding the zone banner
 
         /**
          * Builds the lesson cards on the landing page.
@@ -961,6 +963,12 @@
             const banner = document.getElementById('zone-banner');
             const bannerText = document.getElementById('zone-banner-text');
 
+            // Clear any existing auto-hide timer
+            if (bannerAutoHideTimer) {
+                clearTimeout(bannerAutoHideTimer);
+                bannerAutoHideTimer = null;
+            }
+
             // Set text
             bannerText.textContent = text;
 
@@ -972,6 +980,11 @@
             setTimeout(() => {
                 banner.classList.add('visible');
             }, 50);
+
+            // Set auto-hide timer for 5 seconds
+            bannerAutoHideTimer = setTimeout(() => {
+                hideZoneBanner();
+            }, 5000);
         }
 
         /**
@@ -980,6 +993,12 @@
         function hideZoneBanner() {
             const banner = document.getElementById('zone-banner');
             banner.classList.remove('visible');
+
+            // Clear the auto-hide timer if it exists
+            if (bannerAutoHideTimer) {
+                clearTimeout(bannerAutoHideTimer);
+                bannerAutoHideTimer = null;
+            }
         }
 
         /**
