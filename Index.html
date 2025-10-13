@@ -17,6 +17,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            overflow: hidden;
+            aspect-ratio: 4 / 3;
         }
         #simulation-container.has-zones {
             cursor: default;
@@ -31,6 +33,7 @@
             max-height: 100%;
             display: block;
             transform-origin: center center;
+            object-fit: contain;
         }
         #main-image {
             position: relative; /* In document flow, gives container height */
@@ -367,7 +370,7 @@
                 <div class="loader"></div>
             </div>
             <div class="flex items-center justify-center gap-6 w-full max-w-5xl mx-auto">
-                <div id="simulation-container" class="relative w-full max-w-3xl rounded-lg overflow-visible shadow-inner border border-gray-200 dark:border-gray-700">
+                <div id="simulation-container" class="relative w-full max-w-3xl rounded-lg shadow-inner border border-gray-200 dark:border-gray-700">
                     <img id="main-image" src="" alt="Anatomy diagram" class="microscope-image">
                     <img id="next-image" src="" alt="Next anatomy diagram" class="microscope-image" style="opacity: 0; pointer-events: none;">
                     <div id="zones-overlay"></div>
@@ -627,6 +630,14 @@
                 modalMessage.textContent = message;
 
                 if (type === 'prompt') {
+                    // Clean up old elements first
+                    const existingSelect = document.getElementById('modal-select');
+                    if (existingSelect) {
+                        existingSelect.remove();
+                    }
+                    document.getElementById('modal-multi-fields').classList.add('hidden');
+
+                    // Then show and configure the input
                     modalInput.classList.remove('hidden');
                     modalInput.value = defaultValue || '';
                     modalInput.placeholder = placeholder;
@@ -993,7 +1004,8 @@
 
         /**
          * Creates clickable zone overlays for the current view.
-         * Uses pixel positioning directly based on image dimensions for accurate alignment.
+         * Converts percentage-based zone coordinates to pixels based on rendered image dimensions.
+         * Zones align perfectly because viewer and editor render images at consistent sizes.
          */
         function createZoneOverlays(zones) {
             zonesOverlay.innerHTML = ''; // Clear existing zones
@@ -2025,6 +2037,8 @@
                                         url: uploadResult.url,
                                         index: adminState.currentImageIndex
                                     };
+                                    // Clear zones for new image
+                                    adminState.zones = [];
                                     showZoneEditor();
                                 } else {
                                      showCustomModal({ title: 'Error', message: 'Error uploading image: ' + uploadResult.message, type: 'confirm'});
@@ -2173,91 +2187,84 @@
                                 newZone.label = label.trim();
                             }
 
-                            // Then ask for target image (if lessonImages available)
-                            if (state.lessonImages && state.lessonImages.length > 0) {
-                                const imageOptions = [
-                                    { value: '', label: 'None (Sequential navigation)' },
-                                    { value: 'banner', label: '📝 Display Text Banner' },
-                                    ...state.lessonImages.map(img => ({
-                                        value: img.index.toString(),
-                                        label: `Image ${img.index + 1}: ${img.description}`
-                                    }))
-                                ];
+                            // Then ask for target image (action selection is always shown)
+                            const lessonImages = state.lessonImages || [];
+                            const imageOptions = [
+                                { value: '', label: 'None (Sequential navigation)' },
+                                { value: 'banner', label: '📝 Display Text Banner' },
+                                ...lessonImages.map(img => ({
+                                    value: img.index.toString(),
+                                    label: `Image ${img.index + 1}: ${img.description}`
+                                }))
+                            ];
 
-                                showCustomModal({
-                                    title: 'Select Action',
-                                    message: 'What should happen when this zone is clicked?',
-                                    type: 'select',
-                                    options: imageOptions
-                                }).then(function(targetView) {
-                                    if (targetView !== null) {
-                                        // Check if banner option was selected
-                                        if (targetView === 'banner') {
-                                            // Ask for banner text
-                                            showCustomModal({
-                                                title: 'Banner Text',
-                                                message: 'Enter the text to display in the banner:',
-                                                type: 'prompt',
-                                                placeholder: 'e.g., This is the mitochondria, the powerhouse of the cell!'
-                                            }).then(function(bannerText) {
-                                                if (bannerText !== null && bannerText.trim() !== '') {
-                                                    // Ask for banner position
-                                                    showCustomModal({
-                                                        title: 'Banner Position',
-                                                        message: 'Where should the banner appear?',
-                                                        type: 'select',
-                                                        options: [
-                                                            { value: 'top', label: 'Top of screen' },
-                                                            { value: 'bottom', label: 'Bottom of screen' }
-                                                        ]
-                                                    }).then(function(position) {
-                                                        if (position !== null) {
-                                                            newZone.actionType = 'banner';
-                                                            newZone.bannerText = bannerText.trim();
-                                                            newZone.bannerPosition = position;
+                            showCustomModal({
+                                title: 'Select Action',
+                                message: 'What should happen when this zone is clicked?',
+                                type: 'select',
+                                options: imageOptions
+                            }).then(function(targetView) {
+                                if (targetView !== null) {
+                                    // Check if banner option was selected
+                                    if (targetView === 'banner') {
+                                        // Ask for banner text
+                                        showCustomModal({
+                                            title: 'Banner Text',
+                                            message: 'Enter the text to display in the banner:',
+                                            type: 'prompt',
+                                            placeholder: 'e.g., This is the mitochondria, the powerhouse of the cell!'
+                                        }).then(function(bannerText) {
+                                            if (bannerText !== null && bannerText.trim() !== '') {
+                                                // Ask for banner position
+                                                showCustomModal({
+                                                    title: 'Banner Position',
+                                                    message: 'Where should the banner appear?',
+                                                    type: 'select',
+                                                    options: [
+                                                        { value: 'top', label: 'Top of screen' },
+                                                        { value: 'bottom', label: 'Bottom of screen' }
+                                                    ]
+                                                }).then(function(position) {
+                                                    if (position !== null) {
+                                                        newZone.actionType = 'banner';
+                                                        newZone.bannerText = bannerText.trim();
+                                                        newZone.bannerPosition = position;
 
-                                                            state.zones.push(newZone);
-                                                            state.currentPolygon = [];
-                                                            updateAdminZonesList();
-                                                            redrawAdminCanvas();
-                                                        } else {
-                                                            state.currentPolygon = [];
-                                                            redrawAdminCanvas();
-                                                        }
-                                                    });
-                                                } else {
-                                                    state.currentPolygon = [];
-                                                    redrawAdminCanvas();
-                                                }
-                                            });
-                                        }
-                                        // Add targetView only if a specific image was selected
-                                        else if (targetView !== '') {
-                                            newZone.targetView = parseInt(targetView);
-                                            state.zones.push(newZone);
-                                            state.currentPolygon = [];
-                                            updateAdminZonesList();
-                                            redrawAdminCanvas();
-                                        }
-                                        // Sequential navigation (no targetView)
-                                        else {
-                                            state.zones.push(newZone);
-                                            state.currentPolygon = [];
-                                            updateAdminZonesList();
-                                            redrawAdminCanvas();
-                                        }
-                                    } else {
+                                                        state.zones.push(newZone);
+                                                        state.currentPolygon = [];
+                                                        updateAdminZonesList();
+                                                        redrawAdminCanvas();
+                                                    } else {
+                                                        state.currentPolygon = [];
+                                                        redrawAdminCanvas();
+                                                    }
+                                                });
+                                            } else {
+                                                state.currentPolygon = [];
+                                                redrawAdminCanvas();
+                                            }
+                                        });
+                                    }
+                                    // Add targetView only if a specific image was selected
+                                    else if (targetView !== '') {
+                                        newZone.targetView = parseInt(targetView);
+                                        state.zones.push(newZone);
                                         state.currentPolygon = [];
+                                        updateAdminZonesList();
                                         redrawAdminCanvas();
                                     }
-                                });
-                            } else {
-                                // No lessonImages available, just add the zone
-                                state.zones.push(newZone);
-                                state.currentPolygon = [];
-                                updateAdminZonesList();
-                                redrawAdminCanvas();
-                            }
+                                    // Sequential navigation (no targetView)
+                                    else {
+                                        state.zones.push(newZone);
+                                        state.currentPolygon = [];
+                                        updateAdminZonesList();
+                                        redrawAdminCanvas();
+                                    }
+                                } else {
+                                    state.currentPolygon = [];
+                                    redrawAdminCanvas();
+                                }
+                            });
                         } else {
                             // User cancelled, clear polygon
                             state.currentPolygon = [];
@@ -2543,7 +2550,8 @@
                 title: 'Edit Zone Label',
                 message: 'Enter a new label for this zone (leave empty for default):',
                 type: 'prompt',
-                placeholder: zone.label || `Zone ${index + 1}`
+                placeholder: 'e.g., Nucleus',
+                defaultValue: zone.label || ''
             }).then(function(newLabel) {
                 if (newLabel !== null) {
                     const trimmedLabel = newLabel.trim();
@@ -2555,6 +2563,10 @@
                         // Remove label property to use default
                         delete adminState.zones[index].label;
                     }
+
+                    // Update UI immediately after label change
+                    updateAdminZonesList();
+                    redrawAdminCanvas();
 
                     // Then ask for action type
                     const imageOptions = [
@@ -2729,6 +2741,7 @@
                         try {
                             adminState.zones = JSON.parse(image.zones || '[]');
                         } catch (e) {
+                            console.error('Error parsing zones:', e);
                             adminState.zones = [];
                         }
 
